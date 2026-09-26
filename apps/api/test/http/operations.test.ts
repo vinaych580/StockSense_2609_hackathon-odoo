@@ -187,6 +187,29 @@ describe('GET /operations', () => {
     expect(await ids('late=true')).toEqual([late.id]);
   });
 
+  it('late=false keeps open documents that have no scheduled date', async () => {
+    const { agent, future, other, transfer } = await listSetup();
+    const ids = (await agent.get('/api/v1/operations?late=false')).body.data.map((o: { id: string }) => o.id).sort();
+    expect(ids).toEqual([future.id, other.id, transfer.id].sort());
+  });
+
+  // Expectations assume APP_TIMEZONE=Asia/Kolkata, as in .env.example.
+  it('reads a date-only range as whole business days, and an ISO instant exactly', async () => {
+    const s = await setup();
+    const scheduled = async (iso: string) => {
+      const op = await draft(s.actor, 'RECEIPT', VENDORS, s.stock.id, [{ productId: s.product.id, quantity: '1' }]);
+      await prisma.operation.update({ where: { id: op.id }, data: { scheduledDate: new Date(iso) } });
+      return op.id;
+    };
+    await scheduled('2026-09-25T23:30:00+05:30');
+    const early = await scheduled('2026-09-26T00:30:00+05:30');
+    const late = await scheduled('2026-09-26T23:30:00+05:30');
+    await scheduled('2026-09-27T00:30:00+05:30');
+    const ids = async (q: string) => (await s.agent.get(`/api/v1/operations?${q}`)).body.data.map((o: { id: string }) => o.id).sort();
+    expect(await ids('dateFrom=2026-09-26&dateTo=2026-09-26')).toEqual([early, late].sort());
+    expect(await ids('dateFrom=2026-09-26T12:00:00%2B05:30&dateTo=2026-09-26T23:30:00%2B05:30')).toEqual([late]);
+  });
+
   it('filters by location on either end, and by product category', async () => {
     const { agent, stock, product, transfer, late, future } = await listSetup();
     const cat = await prisma.category.create({ data: { name: 'Furniture' } });

@@ -137,6 +137,30 @@ describe('deliveries', () => {
     expect(await balance(p.id, stock.id)).toBe('3.000');
   });
 
+  it('clears pick and pack when a recheck finds the delivery short again', async () => {
+    const mgr = await makeUser();
+    const { stock } = await makeWarehouse();
+    const p = await makeProduct();
+    await receive(mgr, p.id, stock.id, '5');
+    const op = await readyDelivery(mgr, stock.id, [{ productId: p.id, quantity: '5' }]);
+    const rival = await readyDelivery(mgr, stock.id, [{ productId: p.id, quantity: '5' }]);
+    await act(mgr, rival.id, 'validate');
+    const rechecked = await act(mgr, op.id, 'check-availability');
+    expect(rechecked.operation).toMatchObject({ status: 'WAITING', pickedAt: null, packedAt: null });
+  });
+
+  it('keeps pick and pack when a recheck still finds enough stock', async () => {
+    const mgr = await makeUser();
+    const { stock } = await makeWarehouse();
+    const p = await makeProduct();
+    await receive(mgr, p.id, stock.id, '5');
+    const op = await readyDelivery(mgr, stock.id, [{ productId: p.id, quantity: '5' }]);
+    const rechecked = await act(mgr, op.id, 'check-availability');
+    expect(rechecked.operation.status).toBe('READY');
+    expect(rechecked.operation.pickedAt).not.toBeNull();
+    expect(rechecked.operation.packedAt).not.toBeNull();
+  });
+
   it('shows the gap on short lines while the document is open', async () => {
     const mgr = await makeUser();
     const { stock } = await makeWarehouse();
@@ -299,6 +323,17 @@ describe('state machine', () => {
     await prisma.product.update({ where: { id: p.id }, data: { isActive: false } });
     expect(await errorCode(act(mgr, op.id, 'confirm'))).toBe('INACTIVE_REFERENCE');
     expect(await errorCode(act(mgr, op.id, 'validate'))).toBe('INACTIVE_REFERENCE');
+  });
+
+  it('treats the locations of an archived warehouse as archived', async () => {
+    const mgr = await makeUser();
+    const { warehouse, stock } = await makeWarehouse();
+    const p = await makeProduct();
+    const op = await draft(mgr, 'RECEIPT', VENDORS, stock.id, [{ productId: p.id, quantity: '1' }]);
+    await prisma.warehouse.update({ where: { id: warehouse.id }, data: { isActive: false } });
+    expect(await errorCode(draft(mgr, 'RECEIPT', VENDORS, stock.id, [{ productId: p.id, quantity: '1' }]))).toBe('INACTIVE_REFERENCE');
+    expect(await errorCode(act(mgr, op.id, 'validate'))).toBe('INACTIVE_REFERENCE');
+    expect(await moveCount()).toBe(0);
   });
 });
 

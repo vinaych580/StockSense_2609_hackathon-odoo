@@ -39,13 +39,18 @@ function limiter(windowMs: number, limit: number, key: (req: Request) => string)
 const ip = (req: Request) => ipKeyGenerator(req.ip ?? '');
 const email = (req: Request) => String((req.body as { email?: unknown } | undefined)?.email ?? '').trim().toLowerCase();
 
-/** In-memory limits (one process). Built per app, so each test file starts with clean counters. */
+/**
+ * In-memory limits (one process). Built per app, so each test file starts with clean counters.
+ * Per-email keys matter in the demo: every browser on the laptop (and everything behind the Vite
+ * proxy) shares one IP, so an IP-only key would let one person's typos lock everyone out.
+ */
 export function createLimits() {
   return {
     login: limiter(15 * 60_000, 10, (req) => `${ip(req)}|${email(req)}`),
+    signup: limiter(60 * 60_000, 20, ip),
     forgotPerEmail: limiter(15 * 60_000, 3, email),
     forgotPerIp: limiter(60 * 60_000, 10, ip),
-    verify: limiter(15 * 60_000, 10, ip),
+    verify: limiter(15 * 60_000, 10, (req) => `${ip(req)}|${email(req)}`),
     general: limiter(60_000, 300, (req) => String(req.cookies?.sid ?? ip(req))),
   };
 }

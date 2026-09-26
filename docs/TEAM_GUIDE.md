@@ -11,13 +11,17 @@ plan doc (ask Vinay for the link); this guide is the part you need at the keyboa
 | Area | Status |
 | --- | --- |
 | Monorepo, database, migrations | **Done** (Track A) |
-| Stock engine: posting, operations state machine, seed | **Done** (Track A); 42 tests passing |
-| Shared contracts: enums, error codes, permissions, transitions, operation schemas and response types | **Done** for operations; master-data and auth schemas still to add |
-| Express app, auth, master-data APIs, dashboard, SSE | **Not started** (Track B) |
+| Stock engine: posting, operations state machine, seed | **Done** (Track A) |
+| Shared contracts: enums, error codes, permissions, transitions, operation and stock schemas, response types | **Done** for operations and stock; master-data schemas still to add |
+| Express app: error handler, rate limits, Origin check, sign-up, log-in, `/me`, log-out, sessions | **Done** (Vinay) |
+| `/api/v1/operations` (all routes and list filters), `GET /stock` (with Free to use and forecast), `GET /moves` | **Done** (Vinay) |
+| Master-data APIs, product initial stock, dashboard KPIs, OTP reset, SSE | **Next** (Vinay, Track B) |
 | Web app (`apps/web`) | **Not started** (Tracks C and D) |
-| Operations HTTP routes (`/api/v1/operations`) | **Next for Track A**, as soon as Track B's app skeleton lands |
 
-The Track A code is on branch `feat/a-stock-core`. Until it's merged, branch from it, not `main`.
+`pnpm verify` passes on every branch below. The code is on `feat/a-stock-core` and the branches
+stacked on it (`feat/b-api-skeleton`, `feat/a-operations-routes`, `feat/a-stock-moves`,
+`fix/a-review-findings`). Until they're merged into `main`, branch from the newest one that has
+been pushed, not `main`.
 
 ---
 
@@ -29,7 +33,7 @@ You need **Node 22 or newer** and **pnpm 10**. You do **not** need Docker or a P
 npm i -g pnpm@10
 git clone https://github.com/vinaych580/StockSense_2609_hackathon-odoo.git
 cd StockSense_2609_hackathon-odoo
-git checkout feat/a-stock-core      # until it's merged into main
+git checkout <newest pushed branch>  # see section 1; main once merged
 pnpm install
 cp .env.example apps/api/.env
 ```
@@ -116,34 +120,39 @@ frontend depends on B's endpoints.
 
 ### Track A: stock core (Vinay)
 
-**Done:** schema and migrations, `posting.ts`, the operations service, the seed, tests 1–12 and 14.
+**Done:** schema and migrations, `posting.ts`, the operations service, the seed, tests 1–12 and 14,
+the operations routes, `GET /stock` with Free to use and forecast, and `GET /moves`.
 
-**Next:**
-1. Operations routes: `GET/POST /operations`, `GET/PATCH /operations/:id`,
-   `POST /operations/:id/<action>`, plus the list filters. Built on B's skeleton.
-2. `GET /stock` and `GET /moves`, if B hasn't started them.
-3. Then the M3 list: the ledger integrity card, one-click Replenish, and the Free to use and forecast columns.
+**Next:** the rest of the M3 list: the ledger integrity card and one-click Replenish.
 
-### Track B: platform APIs
+### Track B: platform APIs (Vinay)
 
-**Your first PR (aim for the first 60–90 minutes)** is the Express app skeleton, because Track A's
-routes and every frontend call wait on it:
+**Done:** the Express skeleton (`apps/api/src/app.ts`, `server.ts`), middleware (`requireAuth`,
+`requirePermission`, `validate`, the Origin check, rate limits) and the error handler. The handler
+maps the negative-stock CHECK to 409 `INSUFFICIENT_STOCK`, and every other named CHECK to 400
+`VALIDATION_FAILED` on the field it guards (the list is `FIELD_CHECKS` in `middleware/errors.ts`;
+add new CHECKs there, or they come back as 500). Auth is done too: sign-up (always STAFF), log-in,
+`/me`, log-out, with passwords hashed by `@node-rs/argon2`.
 
-- `apps/api/src/app.ts` (the Express 5 app, exported so tests can use it with Supertest) and
-  `apps/api/src/server.ts` (starts listening on `:3000`)
-- Middleware in `apps/api/src/middleware/`: pino-http with a requestId, JSON body only,
-  Origin allowlist, rate limits, **`requireAuth`** (it loads the user from the session on every
-  request and sets `req.actor = { id, name, role }`), **`requirePermission(permission)`**, and
-  **`validate(zodSchema)`**
-- The **error handler**: `AppError` → `{ error: { code, message, details, requestId } }` with
-  `err.status`; zod errors → 400 `VALIDATION_FAILED`; Postgres `23505` → 409, `23503` → 422/409,
-  `23514` → 409 `INSUFFICIENT_STOCK` (log it at error level; it means the backstop fired); anything
-  else → 500 `INTERNAL`
-- Auth: sign-up (always STAFF), log-in, `/me`, log-out. Hash passwords with **`@node-rs/argon2`**
-  (already installed; the seed uses it, so the demo passwords only verify with it)
+**Next:** master-data APIs with archive and restore, product creation with initial stock, the
+dashboard KPIs, OTP reset through Mailpit, and SSE. Rules for them (from the code review):
 
-**Then:** master-data APIs with archive and restore, product creation with initial stock, the
-dashboard KPIs, Move History, OTP reset through Mailpit, and SSE.
+- **Archiving a warehouse:** lock its locations `FOR UPDATE`, refuse with 409 `IN_USE` if any holds
+  stock, and archive its locations in the same transaction. Documents already treat a location in
+  an archived warehouse as archived.
+- **A warehouse `code` can't change once the warehouse has documents.** References like
+  `WH1/IN/00001` must stay unique, and a reused code would collide with old references.
+- **A product's unit can't change once the product is on any operation line**, not only once it
+  has moves: posting doesn't re-check decimals on open documents. Return 422 `UOM_LOCKED`.
+- **A location's `type` and `warehouseId` can't change** after it is created.
+- **Normalise input in the zod schemas:** SKUs `.trim().toUpperCase()`; emails through `emailInput`.
+- **Product creation with initial stock** must also publish `data.changed` with `masterdata`; the
+  operations service only announces `operation` and `stock`.
+- **OTP:** `createLimits()` already has `forgotPerEmail`, `forgotPerIp` and `verify` (keyed by IP and
+  email). Wire them to the routes. No mail library is installed yet: add `nodemailer` while online.
+- **SSE:** the error handler already ends a stream that has started instead of sending a second response.
+- **Dashboard "Out of stock" with a warehouse filter:** the plan's definition counts every product
+  with nothing in that warehouse (about 20 for WH2). Decide the rule before building it.
 
 - **Initial stock** goes through the stock engine, never a direct insert. Inside one `withTx`:
   `createInTx(tx, actor, { type: 'ADJUSTMENT', sourceLocationId: SYSTEM_LOCATION_IDS.ADJUSTMENT, destLocationId, lines: [{ productId, countedQuantity }] })`,
@@ -164,7 +173,7 @@ top bar) and the log-in and sign-up pages with the demo-accounts panel.
 (list and kanban), the dashboard with filters, and Move History.
 
 - Build against the types in `@stocksense/shared` (`OperationDto`, `OperationActionResponse`,
-  `ListResponse`) while the routes are being written. Their shapes won't change.
+  `ListResponse`). The routes are done and their shapes won't change.
 - **Red lines:** each line of an open delivery or transfer has `onHand` and `shortBy`. When
   `shortBy` isn't null, show the line in red with "needs 10, 4 at WH1/Stock".
 - On a 409 `INSUFFICIENT_STOCK`, `error.details` lists exactly which lines are short
@@ -207,8 +216,10 @@ These are already decided. Don't reinvent them; import them from `@stocksense/sh
 | Virtual locations | Fixed ids in `SYSTEM_LOCATION_IDS` (Vendors, Customers, Inventory adjustment) | `enums.ts` |
 | References | `WH1/IN/00012` (IN = receipt, OUT = delivery, INT = transfer, ADJ = adjustment). The server assigns them | `enums.ts` |
 | Time zone | Dates are stored in UTC. "Late" means scheduled before today in `APP_TIMEZONE` (Asia/Kolkata) and not Done | `apps/api/src/lib/time.ts` |
+| Date filters | `dateFrom` / `dateTo` take a calendar day (`2026-09-26`), meaning that whole day in `APP_TIMEZONE`, both ends inclusive. Or an ISO instant with `Z` or an offset, read exactly. Send the date picker's `YYYY-MM-DD` as is | `schemas/operations.ts` (`dateFilter`) |
+| Query strings | An empty value (`?status=`) means no filter, so a form can send every field | `schemas/operations.ts` (`queryObject`) |
 
-### Operation endpoints (Track A is building these; frontend can build against them now)
+### Operation and stock endpoints (done; build against them)
 
 | Method and path | Body | Returns |
 | --- | --- | --- |
@@ -217,9 +228,13 @@ These are already decided. Don't reinvent them; import them from `@stocksense/sh
 | `GET /api/v1/operations/:id` | | `ItemResponse<OperationDto>` |
 | `PATCH /api/v1/operations/:id` | `operationUpdateInput` (full header and lines, plus `version`) | `ItemResponse<OperationDto>` |
 | `POST /api/v1/operations/:id/{confirm,check-availability,reset-to-draft,pick,unpick,pack,unpack,validate,cancel}` | `{ version, acknowledgeBalanceChange? }` | `ItemResponse<OperationActionResponse>` |
+| `GET /api/v1/stock?productId=&warehouseId=&locationId=&categoryId=&search=&includeZero=&page=&pageSize=` | | `ListResponse<StockRowDto>` |
+| `GET /api/v1/moves?productId=&locationId=&warehouseId=&type=&dateFrom=&dateTo=&search=&page=&pageSize=` | | `ListResponse<MoveDto>` (newest first) |
 
 Validate from Draft works for receipts and adjustments (one click). Deliveries need **pick then pack**
-before validate. A repeat validate by the same user returns 200 with `replayed: true`: treat it as success.
+before validate. If "Check availability" finds a delivery short again, it goes back to Waiting and
+its pick and pack are cleared. A repeat validate by the same user returns 200 with `replayed: true`:
+treat it as success.
 
 ---
 
@@ -244,7 +259,7 @@ before validate. A repeat validate by the same user returns 200 with `replayed: 
 
 ## 7. Git workflow
 
-- **Branch from the latest shared branch:** `feat/a-stock-core` until it's merged, then `main`.
+- **Branch from the latest shared branch:** the newest pushed branch in section 1 until those are merged, then `main`.
   Name branches `feat/<track>-<thing>`, for example `feat/b-auth`, `feat/c-operation-form`,
   `feat/d-products-page`.
 - **Conventional Commits:** `feat(api): …`, `feat(web): …`, `fix(api): …`, `test(api): …`, `chore: …`.
@@ -262,7 +277,7 @@ before validate. A repeat validate by the same user returns 200 with `replayed: 
 - **Tags:** `v0.1` at G1, `v0.2` at G2, `v0.5` at G3, `v0.9` at feature freeze, `v1.0` for the demo.
 
 ```bash
-git checkout feat/a-stock-core && git pull
+git checkout main && git pull   # or the newest pushed branch, until merged
 git checkout -b feat/b-auth
 git add -A
 git commit -m "feat(api): sign-up and log-in with sessions"

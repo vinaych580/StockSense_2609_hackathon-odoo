@@ -3,8 +3,11 @@ import {
   canOperate,
   canTransition,
   fitsUom,
+  moveListQuery,
   operationCreateInput,
+  operationListQuery,
   significantDecimals,
+  stockListQuery,
 } from './index';
 
 const u = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -96,5 +99,22 @@ describe('operation create schema', () => {
     expect(
       operationCreateInput.safeParse({ ...base, type: 'RECEIPT', lines: [{ productId: u(9), quantity: '1.0001' }] }).success,
     ).toBe(false);
+  });
+});
+
+describe('list query strings', () => {
+  it('treats an empty value as no filter, as HTML forms send them', () => {
+    const q = operationListQuery.parse({ type: '', status: '', dateFrom: '', late: '', search: '', page: '' });
+    expect(q).toMatchObject({ page: 1, pageSize: 25, sort: '-createdAt' });
+    expect([q.type, q.status, q.dateFrom, q.late]).toEqual([undefined, undefined, undefined, undefined]);
+    expect(stockListQuery.parse({ includeZero: '', warehouseId: '' }).warehouseId).toBeUndefined();
+    expect(moveListQuery.parse({ type: '', dateTo: '' }).type).toBeUndefined();
+  });
+
+  it('keeps a date filter as given: a calendar day, or an ISO instant with its offset', () => {
+    expect(operationListQuery.parse({ dateFrom: '2026-09-26' }).dateFrom).toBe('2026-09-26');
+    expect(moveListQuery.parse({ dateTo: '2026-09-26T10:00:00+05:30' }).dateTo).toBe('2026-09-26T10:00:00+05:30');
+    expect(operationListQuery.safeParse({ dateFrom: '2026-02-30' }).success).toBe(false);
+    expect(operationListQuery.safeParse({ dateTo: 'yesterday' }).success).toBe(false);
   });
 });

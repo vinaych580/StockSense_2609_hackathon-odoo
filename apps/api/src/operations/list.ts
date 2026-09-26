@@ -1,10 +1,20 @@
 import type { ListResponse, OperationDto, OperationListQuery } from '@stocksense/shared';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/db';
-import { startOfBusinessDay } from '../lib/time';
+import { filterEnd, filterStart, startOfBusinessDay } from '../lib/time';
 import { getOperation } from './dto';
 
 const OPEN: Prisma.OperationWhereInput = { status: { notIn: ['DONE', 'CANCELED'] } };
+
+/**
+ * Late = open and scheduled before today. Not late is spelled out rather than NOT(late): with no
+ * scheduled date the comparison is NULL, and NOT(NULL) would drop undated documents from both lists.
+ */
+function lateWhere(late: boolean): Prisma.OperationWhereInput {
+  const today = startOfBusinessDay();
+  if (late) return { AND: [OPEN, { scheduledDate: { lt: today } }] };
+  return { OR: [{ status: { in: ['DONE', 'CANCELED'] } }, { scheduledDate: null }, { scheduledDate: { gte: today } }] };
+}
 
 /** Filters for GET /operations; the dashboard's operations panel reuses them. */
 export function operationWhere(q: Omit<OperationListQuery, 'sort' | 'page' | 'pageSize'>): Prisma.OperationWhereInput {
@@ -19,11 +29,15 @@ export function operationWhere(q: Omit<OperationListQuery, 'sort' | 'page' | 'pa
       ],
     });
   }
-  if (q.dateFrom || q.dateTo) and.push({ scheduledDate: { gte: q.dateFrom, lte: q.dateTo } });
-  if (q.late !== undefined) {
-    const late: Prisma.OperationWhereInput = { AND: [OPEN, { scheduledDate: { lt: startOfBusinessDay() } }] };
-    and.push(q.late ? late : { NOT: late });
+  if (q.dateFrom || q.dateTo) {
+    and.push({
+      scheduledDate: {
+        gte: q.dateFrom ? filterStart(q.dateFrom) : undefined,
+        lt: q.dateTo ? filterEnd(q.dateTo) : undefined,
+      },
+    });
   }
+  if (q.late !== undefined) and.push(lateWhere(q.late));
   return {
     type: q.type ? { in: q.type } : undefined,
     status: q.status ? { in: q.status } : undefined,

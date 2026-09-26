@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../../src/lib/db';
+import { runAction } from '../../src/operations/service';
 import { act, ADJUST, CUSTOMERS, draft, makeLocation, makeProduct, makeWarehouse, receive, resetDb, VENDORS } from '../factories';
 import { signedIn } from './helpers';
 
@@ -103,6 +104,23 @@ describe('GET /moves', () => {
     expect(await count('type=TRANSFER')).toBe(1);
     expect(await count('search=WH2/IN')).toBe(1);
     expect(await count('search=chair')).toBe(1);
+  });
+
+  // Expectations assume APP_TIMEZONE=Asia/Kolkata, as in .env.example.
+  it('reads a date-only range as whole business days', async () => {
+    const { agent, actor, stock, rods } = await setup();
+    const receivedAt = async (iso: string) => {
+      const op = await draft(actor, 'RECEIPT', VENDORS, stock.id, [{ productId: rods.id, quantity: '1' }]);
+      await runAction(actor, op.id, 'validate', { version: op.version }, { doneAt: new Date(iso) });
+    };
+    await receivedAt('2026-09-25T23:30:00+05:30');
+    await receivedAt('2026-09-26T00:30:00+05:30');
+    await receivedAt('2026-09-26T23:30:00+05:30');
+    await receivedAt('2026-09-27T00:30:00+05:30');
+    const count = async (q: string) => (await agent.get(`/api/v1/moves?${q}`)).body.page.total;
+    expect(await count('dateFrom=2026-09-26&dateTo=2026-09-26')).toBe(2);
+    expect(await count('dateTo=2026-09-25')).toBe(1);
+    expect(await count('dateFrom=2026-09-27')).toBe(1);
   });
 
   it('is empty before anything is validated', async () => {

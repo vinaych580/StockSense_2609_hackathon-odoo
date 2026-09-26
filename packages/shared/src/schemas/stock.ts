@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { OPERATION_TYPES } from '../enums';
-import { csvOf, pageQuery, queryBool } from './operations';
+import { csvOf, dateFilter, pageQuery, queryBool, queryObject } from './operations';
 
 const id = z.uuid();
 
 /** GET /stock filters. `search` matches SKU or product name. */
-export const stockListQuery = z.object({
+export const stockListQuery = queryObject({
   productId: id.optional(),
   warehouseId: id.optional(),
   locationId: id.optional(),
@@ -18,13 +18,14 @@ export const stockListQuery = z.object({
 export type StockListQuery = z.infer<typeof stockListQuery>;
 
 /** GET /moves filters. `locationId` and `warehouseId` match either end; `search` matches reference, SKU or name. */
-export const moveListQuery = z.object({
+export const moveListQuery = queryObject({
   productId: id.optional(),
   locationId: id.optional(),
   warehouseId: id.optional(),
   type: csvOf(OPERATION_TYPES).optional(),
-  dateFrom: z.coerce.date().optional(),
-  dateTo: z.coerce.date().optional(),
+  /** Done date range, inclusive at both ends. */
+  dateFrom: dateFilter.optional(),
+  dateTo: dateFilter.optional(),
   search: z.string().trim().max(100).optional(),
   ...pageQuery,
 });

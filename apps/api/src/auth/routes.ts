@@ -31,7 +31,7 @@ let dummyHash: Promise<string> | undefined;
 export function authRouter(limits: ReturnType<typeof createLimits>): Router {
   const r = Router();
 
-  r.post('/signup', validate(signupInput), async (req, res) => {
+  r.post('/signup', limits.signup, validate(signupInput), async (req, res) => {
     const input = req.body as SignupInput;
     if (await prisma.user.findUnique({ where: { email: input.email }, select: { id: true } })) {
       throw new AppError('EMAIL_TAKEN', 'That email is already registered. Log in instead.');

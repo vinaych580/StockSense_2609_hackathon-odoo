@@ -1,6 +1,10 @@
+import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/db';
+import { errorHandler } from '../../src/middleware/errors';
+import { createLimits } from '../../src/middleware/security';
 import { resetDb } from '../factories';
 import { app, makeLoginUser, ORIGIN, PASSWORD, signedIn } from './helpers';
 
@@ -80,6 +84,31 @@ describe('log-in', () => {
     const cookie = (await post('/auth/login', { email: (await makeLoginUser()).email, password: PASSWORD })).headers['set-cookie'];
     const token = String(cookie).match(/sid=([^;]+)/)![1]!;
     expect((await prisma.session.findMany()).map((s) => s.id)).not.toContain(token);
+  });
+});
+
+describe('abuse limits', () => {
+  it('rate-limits sign-up to 20 per hour per IP', async () => {
+    const fresh = createApp();
+    const signup = (i: number) => post('/auth/signup', { name: 'Flood', email: `flood${i}@stocksense.test`, password: 'long-enough-pass' }, request(fresh));
+    for (let i = 0; i < 20; i++) expect((await signup(i)).status).toBe(201);
+    const res = await signup(20);
+    expect(res.status).toBe(429);
+    expect(res.body.error.code).toBe('RATE_LIMITED');
+  });
+
+  it("counts password-code checks per IP and email, so one person's typos can't lock out a shared network", async () => {
+    const limits = createLimits();
+    const a = express();
+    a.use(express.json());
+    a.post('/verify', limits.verify, (_req, res) => {
+      res.status(204).end();
+    });
+    a.use(errorHandler);
+    const verify = (email: string) => request(a).post('/verify').send({ email });
+    for (let i = 0; i < 10; i++) expect((await verify('a@stocksense.test')).status).toBe(204);
+    expect((await verify('a@stocksense.test')).status).toBe(429);
+    expect((await verify('b@stocksense.test')).status).toBe(204);
   });
 });
 

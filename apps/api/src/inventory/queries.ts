@@ -2,6 +2,7 @@
 import type { ListResponse, LocationType, MoveDto, MoveListQuery, OperationType, StockListQuery, StockRowDto, Uom } from '@stocksense/shared';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/db';
+import { filterEnd, filterStart } from '../lib/time';
 
 const q3 = (d: Prisma.Decimal | string | number) => new Prisma.Decimal(d).toFixed(3);
 const like = (s: string) => `%${s.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
@@ -96,8 +97,8 @@ export async function listMoves(q: MoveListQuery): Promise<ListResponse<MoveDto>
   if (q.locationId) filters.push(Prisma.sql`(m.from_location_id = ${q.locationId}::uuid OR m.to_location_id = ${q.locationId}::uuid)`);
   if (q.warehouseId) filters.push(Prisma.sql`(fl.warehouse_id = ${q.warehouseId}::uuid OR tl.warehouse_id = ${q.warehouseId}::uuid)`);
   if (q.type) filters.push(Prisma.sql`o.type::text IN (${Prisma.join(q.type)})`);
-  if (q.dateFrom) filters.push(Prisma.sql`m.done_at >= ${q.dateFrom}`);
-  if (q.dateTo) filters.push(Prisma.sql`m.done_at <= ${q.dateTo}`);
+  if (q.dateFrom) filters.push(Prisma.sql`m.done_at >= ${filterStart(q.dateFrom)}`);
+  if (q.dateTo) filters.push(Prisma.sql`m.done_at < ${filterEnd(q.dateTo)}`);
   if (q.search) {
     const s = like(q.search);
     filters.push(Prisma.sql`(o.reference ILIKE ${s} OR p.sku ILIKE ${s} OR p.name ILIKE ${s})`);

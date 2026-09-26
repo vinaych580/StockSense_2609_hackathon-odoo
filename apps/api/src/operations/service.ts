@@ -220,8 +220,9 @@ export async function runActionInTx(
       break;
     }
     case 'check-availability': {
-      const status = (await linesFit(tx, op)) ? 'READY' : 'WAITING';
-      await bump(tx, id, { status });
+      // Pick and pack are a checklist on Ready; a document back in Waiting starts the checklist again.
+      if (await linesFit(tx, op)) await bump(tx, id, { status: 'READY' });
+      else await bump(tx, id, { status: 'WAITING', pickedAt: null, packedAt: null });
       break;
     }
     case 'reset-to-draft':
@@ -343,9 +344,11 @@ async function bump(tx: Tx, id: string, data: Prisma.OperationUncheckedUpdateInp
 
 // ─── Reference checks ──────────────────────────────────────────────────────────────────────
 
+/** A location in an archived warehouse reads as archived, whether or not the location row was archived too. */
 async function loadLocation(tx: Tx, id: string): Promise<LocationRef | undefined> {
   const rows = await tx.$queryRaw<LocationRef[]>`
-    SELECT l.id::text, l.type::text AS type, l.is_active, l.warehouse_id::text AS warehouse_id,
+    SELECT l.id::text, l.type::text AS type, (l.is_active AND COALESCE(w.is_active, true)) AS is_active,
+           l.warehouse_id::text AS warehouse_id,
            CASE WHEN w.code IS NULL THEN l.name ELSE w.code || '/' || l.name END AS label
     FROM location l LEFT JOIN warehouse w ON w.id = l.warehouse_id
     WHERE l.id = ${id}::uuid`;

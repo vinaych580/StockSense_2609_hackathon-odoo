@@ -6,6 +6,7 @@
 import { SYSTEM_LOCATION_IDS, type OperationType } from '@stocksense/shared';
 import type { Actor } from '../inventory/posting';
 import { prisma } from '../lib/db';
+import { addDays, businessDay, businessDayStart } from '../lib/time';
 import { createOperation, runAction, type ActionName } from '../operations/service';
 import { ids, USERS } from './master';
 
@@ -97,11 +98,9 @@ function actorFor(key: Doc['by']): Actor {
   return { id: ids.user(u.key), name: u.name, role: u.role };
 }
 
-function dayAt(offset: number, hour = 10): Date {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  d.setHours(hour, 0, 0, 0);
-  return d;
+/** `hour` o'clock on today + offset days, in APP_TIMEZONE (not the machine's zone), so Late counts match on every laptop. */
+export function dayAt(offset: number, hour = 10): Date {
+  return new Date(businessDayStart(addDays(businessDay(new Date()), offset)).getTime() + hour * 3600_000);
 }
 
 export async function seedStock(): Promise<void> {

@@ -101,20 +101,34 @@ export function csvOf<const T extends readonly [string, ...string[]]>(values: T)
 /** ?flag=true / ?flag=false. */
 export const queryBool = z.enum(['true', 'false']).transform((v) => v === 'true');
 
+/**
+ * A date filter, kept as the string given: a calendar day (2026-09-26), which the API reads as
+ * that whole day in APP_TIMEZONE, or an ISO instant with Z or an offset, which it reads exactly.
+ */
+export const dateFilter = z.union([z.iso.date(), z.iso.datetime({ offset: true })]);
+
+/** A query-string object where an empty value (?status=, as forms send it) means "no filter". */
+export function queryObject<T extends z.ZodRawShape>(shape: T) {
+  return z.preprocess(
+    (v) => (v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== '')) : v),
+    z.object(shape),
+  );
+}
+
 export const OPERATION_SORTS = ['-createdAt', 'createdAt', '-scheduledDate', 'scheduledDate', '-reference', 'reference'] as const;
 export type OperationSort = (typeof OPERATION_SORTS)[number];
 
 /** GET /operations filters. `locationId` matches either end; `search` matches the reference or the contact's name. */
-export const operationListQuery = z.object({
+export const operationListQuery = queryObject({
   type: csvOf(OPERATION_TYPES).optional(),
   status: csvOf(OPERATION_STATUSES).optional(),
   warehouseId: id.optional(),
   locationId: id.optional(),
   categoryId: id.optional(),
   search: z.string().trim().max(100).optional(),
-  /** Scheduled date range, inclusive. */
-  dateFrom: z.coerce.date().optional(),
-  dateTo: z.coerce.date().optional(),
+  /** Scheduled date range, inclusive at both ends. */
+  dateFrom: dateFilter.optional(),
+  dateTo: dateFilter.optional(),
   late: queryBool.optional(),
   sort: z.enum(OPERATION_SORTS).default('-createdAt'),
   ...pageQuery,

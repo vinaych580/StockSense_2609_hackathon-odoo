@@ -54,8 +54,11 @@ export async function lockReferences(
       });
   }
 
+  // A location in an archived warehouse reads as archived. Only the location rows are locked; archiving
+  // a warehouse must lock its locations FOR UPDATE, so it runs strictly before or after this.
   const locs = await tx.$queryRaw<LocationRef[]>`
-    SELECT l.id::text, l.type::text AS type, l.is_active, l.warehouse_id::text AS warehouse_id,
+    SELECT l.id::text, l.type::text AS type, (l.is_active AND COALESCE(w.is_active, true)) AS is_active,
+           l.warehouse_id::text AS warehouse_id,
            CASE WHEN w.code IS NULL THEN l.name ELSE w.code || '/' || l.name END AS label
     FROM location l LEFT JOIN warehouse w ON w.id = l.warehouse_id
     WHERE l.id = ANY(${[sourceLocationId, destLocationId]}::uuid[])

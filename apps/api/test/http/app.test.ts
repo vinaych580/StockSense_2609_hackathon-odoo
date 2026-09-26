@@ -4,8 +4,9 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { errorHandler } from '../../src/middleware/errors';
+import { prisma } from '../../src/lib/db';
 import { AppError } from '../../src/lib/errors';
-import { resetDb } from '../factories';
+import { makeProduct, makeWarehouse, resetDb } from '../factories';
 import { app, ORIGIN } from './helpers';
 
 beforeEach(resetDb);
@@ -90,11 +91,48 @@ describe('error handler', () => {
     expect(res.body.error.code).toBe('INACTIVE_REFERENCE');
   });
 
-  it('maps a check violation (the stock backstop) to 409 INSUFFICIENT_STOCK', async () => {
-    const err = new Prisma.PrismaClientKnownRequestError('check', { code: 'P2010', clientVersion: 'x', meta: { code: '23514' } });
+  it('maps the negative-stock CHECK (the stock backstop) to 409 INSUFFICIENT_STOCK', async () => {
+    const p = await makeProduct();
+    const { stock } = await makeWarehouse();
+    const err = await prisma.$executeRaw`
+      INSERT INTO stock_quant (product_id, location_id, quantity, updated_at) VALUES (${p.id}::uuid, ${stock.id}::uuid, -1, now())`.catch(
+      (e: unknown) => e,
+    );
     const res = await throwing(err);
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('INSUFFICIENT_STOCK');
+  });
+
+  it('maps any other CHECK to 400 VALIDATION_FAILED on the field it guards', async () => {
+    const p = await makeProduct();
+    const { warehouse } = await makeWarehouse();
+    const err = await prisma.reorderRule
+      .create({ data: { productId: p.id, warehouseId: warehouse.id, minQty: '10', maxQty: '5' } })
+      .catch((e: unknown) => e);
+    const res = await throwing(err);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatchObject({ code: 'VALIDATION_FAILED', details: [{ path: 'maxQty', message: expect.any(String) }] });
+    expect(res.body.error.message).not.toMatch(/stock/i);
+  });
+
+  it('ends a response that already started (a live stream) instead of sending a second one', async () => {
+    const a = express();
+    a.get('/stream', (_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      res.write('data: hi\n\n');
+      throw new Error('mid-stream');
+    });
+    a.use(errorHandler);
+    const res = await request(a)
+      .get('/stream')
+      .buffer(true)
+      .parse((r, done) => {
+        let text = '';
+        r.on('data', (c: Buffer) => (text += c.toString()));
+        r.on('end', () => done(null, text));
+      });
+    expect(res.status).toBe(200);
+    expect(res.body).toBe('data: hi\n\n');
   });
 
   it('hides anything else behind 500 INTERNAL', async () => {
