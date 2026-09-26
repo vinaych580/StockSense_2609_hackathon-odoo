@@ -1,72 +1,62 @@
 # StockSense
 
-Multi-warehouse inventory management for the Odoo hackathon. Every stock change is a validated
-document (receipt, delivery, transfer, adjustment) that posts to an append-only stock ledger.
+Multi-warehouse inventory management (Odoo hackathon). Every stock change is a validated document
+(receipt, delivery, internal transfer, adjustment) that posts to an append-only stock ledger, so every
+number can be traced back to the documents behind it.
 
-**New to the team? Read [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) first:** setup, who owns what, contracts and git rules.
+## Run it (no Docker needed)
 
-## Setup
-
-Needs Node 22+ and pnpm 10 (`npm i -g pnpm@10`). No Docker required.
+Needs **Node.js 22+** and **pnpm 10** (`npm i -g pnpm@10`, or `corepack enable`).
 
 ```bash
 pnpm install
-cp .env.example apps/api/.env
-pnpm db:start          # PostgreSQL 16 on :5433 from node_modules (leave it running)
-pnpm db:reset          # in a second terminal: migrate + seed the demo data
-pnpm verify            # typecheck + all tests
+pnpm start
 ```
 
-With Docker you can use `docker compose up -d` instead of `pnpm db:start` (same port, also runs Mailpit).
-Tests start the embedded Postgres by themselves if nothing is listening on :5433.
+`pnpm start` does everything: starts PostgreSQL 16 (bundled, data in `apps/api/.pgdata`), applies
+migrations, loads the demo data on first run, starts the local mailbox, the API and the web app, then
+opens the browser. Ctrl+C stops everything.
+
+| What | Where |
+| --- | --- |
+| App | http://localhost:5173 |
+| Local inbox (password-reset emails) | http://localhost:8025 |
+| API | http://localhost:3000/api/v1 |
+
+Demo logins (password `change-me-demo-pass`, set by `SEED_PASSWORD` in `apps/api/.env`):
+
+- `manager@stocksense.test`: Manager (Priya)
+- `staff@stocksense.test`: Staff (Neha)
+
+The log-in page also has one-click demo account buttons.
+
+## Demo walkthrough
+
+1. Log in as the Manager and look at the **Floor** dashboard: KPIs, low and out-of-stock alerts, and ledger integrity.
+2. **Stock**: on hand, free to use, and forecast per product and location; open a product to see its moves.
+3. **Receipts / Deliveries / Transfers / Adjustments**: create a document, confirm it, pick and pack a delivery, then validate it. Stock never goes negative.
+4. **Ledger**: every move, newest first, with its source document.
+5. Open a second browser window: changes appear live (SSE), with no refresh.
+6. **Forgot password?** on the log-in page: the 6-digit code arrives in the local inbox at http://localhost:8025.
+7. **Team** (Managers only): change roles and deactivate users.
+
+## Useful commands
 
 | Command | What it does |
 | --- | --- |
-| `pnpm db:start` | Embedded Postgres (data in `apps/api/.pgdata`), creates `stocksense` and `stocksense_test` |
-| `pnpm db:migrate` | Apply migrations, then restore the virtual locations |
-| `pnpm db:seed` | Truncate and reseed (`pnpm --filter @stocksense/api seed:master` for master data only) |
-| `pnpm db:reset` | Migrate + seed; same result every time |
-| `pnpm db:check` | Ledger reconciliation: every balance equals its moves in minus moves out |
+| `pnpm start` | Run everything (add `--no-open` to skip opening the browser) |
+| `pnpm db:reset` | Restore the demo data (run while `pnpm start` is running) |
+| `pnpm db:check` | Ledger reconciliation check |
+| `pnpm verify` | Typecheck and run all tests |
 
-Demo logins (password = `SEED_PASSWORD` in `.env`): `manager@stocksense.test` (Manager),
-`staff@stocksense.test` (Staff).
+## Troubleshooting
 
-## Layout
+- **"Port 3000/5173 is already in use"**: StockSense is already running in another terminal, or another program is using that port. Close it.
+- **Windows: the database won't start**: install the Microsoft Visual C++ Redistributable (x64) and try again.
+- **Start over completely**: stop the app, delete `apps/api/.pgdata`, then run `pnpm start`.
+- With Docker you can use `docker compose up -d` (Postgres + Mailpit on the same ports) instead of the bundled ones.
 
-```
-apps/api/        prisma/ (schema, migrations)   src/inventory/posting.ts (the only stock writer)
-                 src/operations/ (state machine) src/seed/   test/
-packages/shared/ enums, error codes, transition table, permission map, zod schemas
-```
+## Stack
 
-## Stock core (Track A): how it works
-
-- **Ledger + balances.** `stock_move` is append-only (a trigger rejects UPDATE/DELETE);
-  `stock_quant` has `CHECK (quantity >= 0)`. Both are written only by `post()` in
-  `apps/api/src/inventory/posting.ts`, in the same transaction; a test enforces this.
-- **Lock protocol.** Operation row `FOR UPDATE` → products `FOR SHARE` (sorted) → locations
-  `FOR SHARE` → create missing balance rows at 0 → every balance key `FOR UPDATE` in one sorted
-  order → compute in memory → write. The whole transaction retries on deadlock (up to 3 times,
-  then 503 `BUSY_RETRY`); with the sorted order the concurrency tests see zero retries.
-- **State machine** (`apps/api/src/operations/service.ts`). Draft → Ready/Waiting → Done, or
-  Canceled. Permission is checked on the stored type after the row is locked, then status, then
-  version (`STALE_VERSION`). Receipts and adjustments may be validated straight from Draft.
-  Deliveries need pick then pack. A repeat Validate by the same user is a 200 replay.
-- **Adjustments** record the balance when counted; if stock moved since, Validate returns
-  409 `BALANCE_CHANGED` unless `acknowledgeBalanceChange` is sent.
-
-### Service API for the other tracks
-
-```ts
-import { createOperation, updateOperation, runAction } from './operations/service';
-import { getOperation } from './operations/dto';        // lines include onHand and shortBy (red lines)
-import { checkLedger } from './inventory/integrity';    // dashboard "Ledger integrity" card
-import { createInTx, runActionInTx } from './operations/service'; // product initial stock, inside your tx
-
-await runAction(actor, id, 'validate', { version, acknowledgeBalanceChange });
-// actions: confirm, check-availability, reset-to-draft, pick, unpick, pack, unpack, validate, cancel
-```
-
-Errors are `AppError { code, status, message, details }`, with codes and HTTP statuses from
-`packages/shared/src/errors.ts`. Events for SSE are published after commit on `bus` in
-`apps/api/src/lib/events.ts`.
+TypeScript monorepo (pnpm): Express 5 + Prisma + PostgreSQL (`apps/api`), React 19 + Vite + Tailwind
+(`apps/web`), shared zod schemas (`packages/shared`). Details for developers: [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md).

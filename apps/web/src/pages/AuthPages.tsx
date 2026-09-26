@@ -292,7 +292,18 @@ export function ResetPage() {
         </form>
       ) : (
         <form onSubmit={reset} noValidate className="flex flex-col gap-4">
-          {sent && <Note title="Check your email">{sent}</Note>}
+          {sent && (
+            <Note
+              title="Check your email"
+              actions={import.meta.env.DEV && (
+                <a href="http://localhost:8025" target="_blank" rel="noreferrer" className="text-sm font-semibold text-blue underline">
+                  Open local inbox
+                </a>
+              )}
+            >
+              {sent}
+            </Note>
+          )}
           <FormError message={formError} />
           <FieldGrid className="grid-cols-[9rem_1fr]">
             <Field label="Code" htmlFor="code" error={errors.code}>

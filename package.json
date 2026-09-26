@@ -6,15 +6,19 @@
     "node": ">=22"
   },
   "scripts": {
+    "start": "node scripts/start.mjs",
+    "dev": "node scripts/start.mjs",
     "dev:api": "pnpm --filter @stocksense/api dev",
     "dev:web": "pnpm --filter @stocksense/web dev",
+    "mail": "pnpm --filter @stocksense/api mail",
     "db:start": "pnpm --filter @stocksense/api db:start",
+    "db:prepare": "pnpm --filter @stocksense/api db:prepare",
     "db:migrate": "pnpm --filter @stocksense/api db:migrate",
+    "db:seed": "pnpm --filter @stocksense/api db:seed",
     "db:reset": "pnpm --filter @stocksense/api db:reset",
     "db:check": "pnpm --filter @stocksense/api db:check",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "verify": "pnpm -r typecheck && pnpm -r test",
-    "db:seed": "pnpm --filter @stocksense/api db:seed"
+    "verify": "pnpm -r typecheck && pnpm -r test"
   }
 }
