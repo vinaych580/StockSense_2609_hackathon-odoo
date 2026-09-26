@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { ProductCreatePage } from '@/pages/ProductCreatePage';
 import { ProductDetailsPage } from '@/pages/ProductDetailsPage';
 import { ProductCategoriesPage } from '@/pages/ProductCategoriesPage';
@@ -41,6 +42,7 @@ export function App() {
           <Route path="/products/new" element={<ProductCreatePage />} />
           <Route path="/products/categories" element={<ProductCategoriesPage />} />
           <Route path="/products/:id" element={<ProductDetailsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           {PLACEHOLDERS.map((p) => (
             <Route key={p.path} path={p.path} element={<PlaceholderPage title={p.title} task={p.task} />} />
           ))}
