@@ -84,3 +84,33 @@ export interface MeDto {
   /** Every non-operation capability this role has; operation buttons use canOperate(). */
   permissions: Permission[];
 }
+
+/** GET /stock: one row per product and internal location. */
+export interface StockRowDto {
+  product: { id: string; sku: string; name: string; uom: Uom; isActive: boolean; category: { id: string; name: string } | null };
+  location: { id: string; label: string; warehouseId: string };
+  onHand: string;
+  /** Confirmed (Waiting or Ready) deliveries and transfers out of this location. */
+  outgoing: string;
+  /** Confirmed receipts and transfers into this location. */
+  incoming: string;
+  /** onHand − outgoing; negative means more is promised than is here. */
+  freeToUse: string;
+  /** onHand − outgoing + incoming. */
+  forecast: string;
+}
+
+/** GET /moves: one ledger row. IN comes from outside the warehouses, OUT leaves them, INTERNAL moves between them. */
+export interface MoveDto {
+  id: string;
+  doneAt: string;
+  operationId: string;
+  reference: string;
+  operationType: OperationType;
+  product: { id: string; sku: string; name: string; uom: Uom };
+  from: { id: string; label: string; type: LocationType };
+  to: { id: string; label: string; type: LocationType };
+  quantity: string;
+  direction: 'IN' | 'OUT' | 'INTERNAL';
+  doneBy: { id: string; name: string };
+}

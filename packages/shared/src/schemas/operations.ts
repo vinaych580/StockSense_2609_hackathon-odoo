@@ -98,7 +98,8 @@ export function csvOf<const T extends readonly [string, ...string[]]>(values: T)
     .pipe(z.array(z.enum(values)).min(1));
 }
 
-const bool = z.enum(['true', 'false']).transform((v) => v === 'true');
+/** ?flag=true / ?flag=false. */
+export const queryBool = z.enum(['true', 'false']).transform((v) => v === 'true');
 
 export const OPERATION_SORTS = ['-createdAt', 'createdAt', '-scheduledDate', 'scheduledDate', '-reference', 'reference'] as const;
 export type OperationSort = (typeof OPERATION_SORTS)[number];
@@ -114,7 +115,7 @@ export const operationListQuery = z.object({
   /** Scheduled date range, inclusive. */
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
-  late: bool.optional(),
+  late: queryBool.optional(),
   sort: z.enum(OPERATION_SORTS).default('-createdAt'),
   ...pageQuery,
 });

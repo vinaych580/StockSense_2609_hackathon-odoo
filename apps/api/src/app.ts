@@ -8,6 +8,7 @@ import { logger } from './lib/logger';
 import { requireAuth } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/errors';
 import { createLimits, csrfGuard } from './middleware/security';
+import { movesRouter, stockRouter } from './inventory/routes';
 import { operationsRouter } from './operations/routes';
 
 export function createApp() {
@@ -38,6 +39,8 @@ export function createApp() {
   // Everything below needs a session; the general limit is keyed by it.
   api.use(limits.general);
   api.use('/operations', requireAuth, operationsRouter());
+  api.use('/stock', requireAuth, stockRouter());
+  api.use('/moves', requireAuth, movesRouter());
 
   app.use('/api/v1', api);
   app.use(notFoundHandler);
