@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev:api": "pnpm --filter @stocksense/api dev",
+    "dev:web": "pnpm --filter @stocksense/web dev",
     "db:start": "pnpm --filter @stocksense/api db:start",
     "db:migrate": "pnpm --filter @stocksense/api db:migrate",
     "db:reset": "pnpm --filter @stocksense/api db:reset",
