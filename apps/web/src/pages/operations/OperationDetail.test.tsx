@@ -260,7 +260,7 @@ describe('OperationDetail', () => {
     const { user } = setup(delivery, {
       'POST /operations/op-1/pack': [409, { error: { code: 'NOT_READY', message: 'Pick WH1/IN/00012 before packing it' } }],
     });
-    await user.click(await screen.findByRole('button', { name: 'Mark packed' }));
+    await user.click(await screen.findByRole('button', { name: 'Pack' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Pick WH1/IN/00012 before packing it');
   });
 

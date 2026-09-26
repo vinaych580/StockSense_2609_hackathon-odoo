@@ -4,12 +4,12 @@ import { useCallback, useState } from 'react';
 
 import { api, isApiError } from '@/lib/api';
 
-import type { ButtonAction } from './actions';
+import type { AnyAction } from './actions';
 
 export const operationDetailKey = (id: string) => ['operations', 'detail', id] as const;
 
 export interface ActionState {
-  pending: ButtonAction | null;
+  pending: AnyAction | null;
   notice?: string;
   /** `warning` for outcomes that need attention: waiting for stock, or a reload after someone else's change. */
   noticeTone?: 'success' | 'warning';
@@ -17,12 +17,12 @@ export interface ActionState {
   /** INSUFFICIENT_STOCK: exactly the lines that are short, by product. */
   shortLines: Map<string, ShortLine>;
   /** BALANCE_CHANGED: the counts to confirm, and the action to resend. */
-  changed?: { action: ButtonAction; balances: ChangedBalance[] };
+  changed?: { action: AnyAction; balances: ChangedBalance[] };
 }
 
 const EMPTY: ActionState = { pending: null, shortLines: new Map() };
 
-function successNotice(action: ButtonAction, res: OperationActionResponse) {
+function successNotice(action: AnyAction, res: OperationActionResponse, before: OperationDto | undefined) {
   if (res.replayed) return 'Already validated.';
   const op = res.operation;
   switch (action) {
@@ -34,9 +34,13 @@ function successNotice(action: ButtonAction, res: OperationActionResponse) {
     case 'check-availability':
       return op.status === 'WAITING' ? 'Waiting for stock.' : 'Ready.';
     case 'pick':
-      return 'Marked picked.';
+      return 'Picked.';
     case 'pack':
-      return 'Marked packed.';
+      return 'Packed.';
+    case 'unpick':
+      return before?.packedAt ? 'Pick undone. Pack cleared too.' : 'Pick undone.';
+    case 'unpack':
+      return 'Pack undone.';
     case 'reset-to-draft':
       return 'Back to Draft.';
     case 'cancel':
@@ -53,9 +57,10 @@ export function useOperationAction(id: string) {
   const [state, setState] = useState<ActionState>(EMPTY);
 
   const run = useCallback(
-    async (action: ButtonAction, options: { acknowledgeBalanceChange?: boolean } = {}) => {
+    async (action: AnyAction, options: { acknowledgeBalanceChange?: boolean } = {}) => {
       // Always the latest version in the cache, so a retry after a reload uses the new one.
-      const version = queryClient.getQueryData<OperationDto>(operationDetailKey(id))?.version;
+      const before = queryClient.getQueryData<OperationDto>(operationDetailKey(id));
+      const version = before?.version;
       setState((s) => ({ ...s, pending: action, alert: undefined, notice: undefined }));
       try {
         const res = await api.post<OperationActionResponse>(`/operations/${id}/${action}`, {
@@ -65,7 +70,7 @@ export function useOperationAction(id: string) {
         queryClient.setQueryData(operationDetailKey(id), res.operation);
         void queryClient.invalidateQueries({ queryKey: ['operations', 'list'] });
         const waiting = !res.replayed && res.operation.status === 'WAITING';
-        setState({ ...EMPTY, notice: successNotice(action, res), noticeTone: waiting ? 'warning' : 'success' });
+        setState({ ...EMPTY, notice: successNotice(action, res, before), noticeTone: waiting ? 'warning' : 'success' });
       } catch (e) {
         if (isApiError(e, 'INSUFFICIENT_STOCK')) {
           const lines = (e.error.details as ShortLine[] | undefined) ?? [];
