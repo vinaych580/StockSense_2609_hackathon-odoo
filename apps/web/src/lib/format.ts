@@ -14,3 +14,18 @@ const inputFormat = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIMEZONE, y
 export function toDateInput(iso: string) {
   return inputFormat.format(new Date(iso));
 }
+
+const dateTimeFormat = new Intl.DateTimeFormat('en-IN', {
+  timeZone: APP_TIMEZONE,
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** "26 Sept 2026, 14:05" in APP_TIMEZONE. */
+export function formatDateTime(iso: string) {
+  return dateTimeFormat.format(new Date(iso));
+}

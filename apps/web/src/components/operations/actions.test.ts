@@ -1,7 +1,7 @@
 import type { OperationDto } from '@stocksense/shared';
 import { describe, expect, it } from 'vitest';
 
-import { actionEffect, availableActions, shortMessage } from './actions';
+import { actionEffect, availableActions, blockedReason, checklistActions, shortMessage } from './actions';
 
 function op(overrides: Partial<OperationDto>): OperationDto {
   return {
@@ -37,8 +37,8 @@ describe('availableActions', () => {
     ['Draft receipt, Staff', op({}), 'STAFF', ['validate']],
     ['Ready receipt, Staff', op({ status: 'READY' }), 'STAFF', ['validate']],
     ['Draft delivery, Manager', op({ type: 'DELIVERY' }), 'MANAGER', ['confirm', 'cancel']],
-    ['Ready delivery, Staff', op({ type: 'DELIVERY', status: 'READY' }), 'STAFF', ['pick']],
-    ['Ready delivery, picked, Manager', op({ type: 'DELIVERY', status: 'READY', pickedAt: 'x' }), 'MANAGER', ['check-availability', 'pack', 'validate', 'reset-to-draft', 'cancel']],
+    ['Ready delivery, Staff', op({ type: 'DELIVERY', status: 'READY' }), 'STAFF', []],
+    ['Ready delivery, picked, Manager', op({ type: 'DELIVERY', status: 'READY', pickedAt: 'x' }), 'MANAGER', ['check-availability', 'validate', 'reset-to-draft', 'cancel']],
     ['Ready delivery, packed, Staff', op({ type: 'DELIVERY', status: 'READY', pickedAt: 'x', packedAt: 'x' }), 'STAFF', []],
     ['Waiting transfer, Staff', op({ type: 'TRANSFER', status: 'WAITING' }), 'STAFF', ['check-availability', 'reset-to-draft', 'cancel']],
     ['Draft adjustment, Staff', op({ type: 'ADJUSTMENT' }), 'STAFF', ['confirm', 'cancel']],
@@ -47,6 +47,37 @@ describe('availableActions', () => {
     ['Canceled delivery, Manager', op({ type: 'DELIVERY', status: 'CANCELED' }), 'MANAGER', []],
   ] as const)('%s', (_, operation, role, expected) => {
     expect(availableActions(operation, role)).toEqual(expected);
+  });
+});
+
+describe('checklistActions', () => {
+  const delivery = (pickedAt: string | null, packedAt: string | null) => op({ type: 'DELIVERY', status: 'READY', pickedAt, packedAt });
+
+  it.each(['MANAGER', 'STAFF'] as const)('%s can do every step and undo', (role) => {
+    expect([...checklistActions(delivery(null, null), role)]).toEqual(['pick', 'pack']);
+    expect([...checklistActions(delivery('t', null), role)]).toEqual(['unpick', 'pack']);
+    expect([...checklistActions(delivery('t', 't'), role)]).toEqual(['unpick', 'unpack']);
+  });
+
+  it('offers nothing outside a Ready delivery', () => {
+    expect(checklistActions(op({ type: 'DELIVERY', status: 'WAITING' }), 'MANAGER').size).toBe(0);
+    expect(checklistActions(op({ type: 'TRANSFER', status: 'READY' }), 'MANAGER').size).toBe(0);
+  });
+});
+
+describe('blockedReason', () => {
+  it('holds a delivery\'s Validate until it is picked and packed, and Pack until picked', () => {
+    const d = (pickedAt: string | null, packedAt: string | null) => op({ type: 'DELIVERY', status: 'READY', pickedAt, packedAt });
+    expect(blockedReason(d(null, null), 'validate')).toBe('Pick and pack first.');
+    expect(blockedReason(d('t', null), 'validate')).toBe('Pack first.');
+    expect(blockedReason(d('t', 't'), 'validate')).toBeUndefined();
+    expect(blockedReason(d(null, null), 'pack')).toBe('Pick first.');
+    expect(blockedReason(d('t', null), 'pack')).toBeUndefined();
+  });
+
+  it('never blocks a transfer or receipt', () => {
+    expect(blockedReason(op({ type: 'TRANSFER', status: 'READY' }), 'validate')).toBeUndefined();
+    expect(blockedReason(op({ status: 'READY' }), 'validate')).toBeUndefined();
   });
 });
 

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { ActionBar } from '@/components/operations/ActionBar';
 import { LinesTable } from '@/components/operations/LinesTable';
+import { PickPackChecklist } from '@/components/operations/PickPackChecklist';
 import type { useOperationAction } from '@/components/operations/useOperationAction';
 import { StatusStepper } from '@/components/shared/StatusStepper';
 import { formatDate } from '@/lib/format';
@@ -48,13 +49,6 @@ export function OperationDetail({ operation: op, actions }: { operation: Operati
             {op.isLate && <LatePill />}
           </span>
         </Field>
-        {op.type === 'DELIVERY' && (
-          <Field label="Pick & pack">
-            {op.pickedAt ? `Picked ${formatDate(op.pickedAt)}` : 'Not picked'}
-            {' · '}
-            {op.packedAt ? `Packed ${formatDate(op.packedAt)}` : 'Not packed'}
-          </Field>
-        )}
         <Field label="Created">{by(op.createdBy, op.createdAt)}</Field>
         {op.validatedBy && <Field label="Validated">{by(op.validatedBy, op.validatedAt)}</Field>}
         {op.canceledBy && <Field label="Canceled">{by(op.canceledBy, op.canceledAt)}</Field>}
@@ -66,6 +60,7 @@ export function OperationDetail({ operation: op, actions }: { operation: Operati
       </dl>
 
       <ActionBar operation={op} actions={actions} />
+      {op.type === 'DELIVERY' && op.status === 'READY' && <PickPackChecklist operation={op} actions={actions} />}
       <LinesTable operation={op} shortLines={actions.shortLines} />
     </>
   );

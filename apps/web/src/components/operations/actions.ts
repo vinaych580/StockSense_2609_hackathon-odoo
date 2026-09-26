@@ -2,31 +2,62 @@ import { canOperate, canTransition, type OperationAction, type OperationDto, typ
 
 import { trimQuantity } from './formSchema';
 
-/** The buttons, in the order they appear. Unpick and unpack belong to C8's checklist. */
-export const ACTION_ORDER = ['confirm', 'check-availability', 'pick', 'pack', 'validate', 'reset-to-draft', 'cancel'] as const;
+/** The action bar's buttons, in order. Pick and pack live in the delivery checklist instead. */
+export const ACTION_ORDER = ['confirm', 'check-availability', 'validate', 'reset-to-draft', 'cancel'] as const;
 export type ButtonAction = (typeof ACTION_ORDER)[number];
 
-export const ACTION_LABEL: Record<ButtonAction, string> = {
+/** The delivery checklist's steps and their undo. */
+export const CHECKLIST_ACTIONS = ['pick', 'unpick', 'pack', 'unpack'] as const;
+export type ChecklistAction = (typeof CHECKLIST_ACTIONS)[number];
+
+export type AnyAction = ButtonAction | ChecklistAction;
+
+export const ACTION_LABEL: Record<AnyAction, string> = {
   confirm: 'Confirm',
   'check-availability': 'Check availability',
-  pick: 'Mark picked',
-  pack: 'Mark packed',
   validate: 'Validate',
   'reset-to-draft': 'Back to draft',
   cancel: 'Cancel',
+  pick: 'Pick',
+  unpick: 'Undo pick',
+  pack: 'Pack',
+  unpack: 'Undo pack',
 };
 
 /** Validate and Cancel ask first: one changes stock, the other can't be undone. */
 export const NEEDS_CONFIRMATION: ReadonlySet<ButtonAction> = new Set(['validate', 'cancel']);
 
-/** Buttons this role may press on this document now: the state machine and the role must both allow it. */
+const allowed = (op: OperationDto, role: Role, action: OperationAction) =>
+  canTransition(action, op.type, op.status) && canOperate(role, action, op.type);
+
+/** Bar buttons this role may press on this document now: the state machine and the role must both allow it. */
 export function availableActions(op: OperationDto, role: Role): ButtonAction[] {
-  return ACTION_ORDER.filter((action) => {
-    if (!canTransition(action as OperationAction, op.type, op.status) || !canOperate(role, action, op.type)) return false;
-    if (action === 'pick') return !op.pickedAt;
-    if (action === 'pack') return !!op.pickedAt && !op.packedAt;
-    return true;
-  });
+  return ACTION_ORDER.filter((action) => allowed(op, role, action));
+}
+
+/** Checklist actions this role may press now: each step, or its undo once done. */
+export function checklistActions(op: OperationDto, role: Role): Set<ChecklistAction> {
+  const state: Record<ChecklistAction, boolean> = {
+    pick: !op.pickedAt,
+    unpick: !!op.pickedAt,
+    pack: !op.packedAt,
+    unpack: !!op.packedAt,
+  };
+  return new Set(CHECKLIST_ACTIONS.filter((action) => state[action] && allowed(op, role, action)));
+}
+
+/**
+ * Why an allowed button can't be pressed yet. The state machine lets a Ready delivery validate, but the
+ * server refuses it (NOT_READY) until it's picked and packed, so the button waits for both.
+ */
+export function blockedReason(op: OperationDto, action: AnyAction): string | undefined {
+  if (op.type !== 'DELIVERY') return undefined;
+  if (action === 'validate' && op.status === 'READY') {
+    if (!op.pickedAt) return 'Pick and pack first.';
+    if (!op.packedAt) return 'Pack first.';
+  }
+  if (action === 'pack' && !op.pickedAt) return 'Pick first.';
+  return undefined;
 }
 
 const products = (n: number) => `${n} product${n === 1 ? '' : 's'}`;

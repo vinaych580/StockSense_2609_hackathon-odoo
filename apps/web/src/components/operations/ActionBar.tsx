@@ -6,7 +6,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-import { ACTION_LABEL, actionEffect, availableActions, type ButtonAction, NEEDS_CONFIRMATION } from './actions';
+import { ACTION_LABEL, actionEffect, availableActions, blockedReason, type ButtonAction, NEEDS_CONFIRMATION } from './actions';
 import { trimQuantity } from './formSchema';
 import type { useOperationAction } from './useOperationAction';
 
@@ -25,11 +25,13 @@ export function ActionBar({ operation: op, actions, disabledReason }: Props) {
   const available = user ? availableActions(op, user.role) : [];
   const busy = actions.pending !== null;
 
+  const blocked = available.map((action) => blockedReason(op, action)).find(Boolean);
+
   const button = (action: ButtonAction) => {
     const primary = action === 'validate';
     const props = {
       variant: primary ? ('default' as const) : ('outline' as const),
-      disabled: busy || !!disabledReason,
+      disabled: busy || !!disabledReason || !!blockedReason(op, action),
     };
     if (NEEDS_CONFIRMATION.has(action)) {
       return (
@@ -64,7 +66,7 @@ export function ActionBar({ operation: op, actions, disabledReason }: Props) {
       {available.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {available.map(button)}
-          {disabledReason && <span className="text-sm text-muted">{disabledReason}</span>}
+          {(disabledReason ?? blocked) && <span className="text-sm text-muted">{disabledReason ?? blocked}</span>}
         </div>
       )}
 
