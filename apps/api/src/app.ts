@@ -5,8 +5,10 @@ import express, { Router } from 'express';
 import { pinoHttp } from 'pino-http';
 import { authRouter } from './auth/routes';
 import { logger } from './lib/logger';
+import { requireAuth } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/errors';
 import { createLimits, csrfGuard } from './middleware/security';
+import { operationsRouter } from './operations/routes';
 
 export function createApp() {
   const app = express();
@@ -35,6 +37,7 @@ export function createApp() {
   api.use('/auth', authRouter(limits));
   // Everything below needs a session; the general limit is keyed by it.
   api.use(limits.general);
+  api.use('/operations', requireAuth, operationsRouter());
 
   app.use('/api/v1', api);
   app.use(notFoundHandler);

@@ -17,3 +17,13 @@ export function isLate(scheduledDate: Date | null, status: string, now = new Dat
   if (!scheduledDate || status === 'DONE' || status === 'CANCELED') return false;
   return businessDay(scheduledDate) < businessDay(now);
 }
+
+/** Midnight today in the business time zone, as an instant. "Late" means scheduled before this. */
+export function startOfBusinessDay(now = new Date()): Date {
+  const offset =
+    new Intl.DateTimeFormat('en-US', { timeZone: APP_TIMEZONE, timeZoneName: 'longOffset' })
+      .formatToParts(now)
+      .find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';
+  const m = offset.match(/GMT([+-]\d{2}):?(\d{2})?/);
+  return new Date(`${businessDay(now)}T00:00:00${m ? `${m[1]}:${m[2] ?? '00'}` : 'Z'}`);
+}

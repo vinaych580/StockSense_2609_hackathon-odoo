@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OPERATION_TYPES, type OperationType } from '../enums';
+import { OPERATION_STATUSES, OPERATION_TYPES, type OperationType } from '../enums';
 import { QUANTITY_PATTERN } from '../quantity';
 
 const id = z.uuid();
@@ -83,3 +83,39 @@ export const operationActionInput = z.object({
   acknowledgeBalanceChange: z.boolean().optional(),
 });
 export type OperationActionInput = z.infer<typeof operationActionInput>;
+
+/** ?page=&pageSize= on every list. Page size is at most 100. */
+export const pageQuery = {
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+};
+
+/** A query value given as "A,B" or repeated (?x=A&x=B), checked against allowed values. */
+export function csvOf<const T extends readonly [string, ...string[]]>(values: T) {
+  return z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v.join(',') : v).split(',').map((s) => s.trim()).filter(Boolean))
+    .pipe(z.array(z.enum(values)).min(1));
+}
+
+const bool = z.enum(['true', 'false']).transform((v) => v === 'true');
+
+export const OPERATION_SORTS = ['-createdAt', 'createdAt', '-scheduledDate', 'scheduledDate', '-reference', 'reference'] as const;
+export type OperationSort = (typeof OPERATION_SORTS)[number];
+
+/** GET /operations filters. `locationId` matches either end; `search` matches the reference or the contact's name. */
+export const operationListQuery = z.object({
+  type: csvOf(OPERATION_TYPES).optional(),
+  status: csvOf(OPERATION_STATUSES).optional(),
+  warehouseId: id.optional(),
+  locationId: id.optional(),
+  categoryId: id.optional(),
+  search: z.string().trim().max(100).optional(),
+  /** Scheduled date range, inclusive. */
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional(),
+  late: bool.optional(),
+  sort: z.enum(OPERATION_SORTS).default('-createdAt'),
+  ...pageQuery,
+});
+export type OperationListQuery = z.infer<typeof operationListQuery>;
