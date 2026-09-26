@@ -54,9 +54,8 @@ The log-in page also has one-click demo account buttons.
 - **"Port 3000/5173 is already in use"**: StockSense is already running in another terminal, or another program is using that port. Close it.
 - **Windows: the database won't start**: install the Microsoft Visual C++ Redistributable (x64) and try again.
 - **Start over completely**: stop the app, delete `apps/api/.pgdata`, then run `pnpm start`.
-- With Docker you can use `docker compose up -d` (Postgres + Mailpit on the same ports) instead of the bundled ones.
 
 ## Stack
 
 TypeScript monorepo (pnpm): Express 5 + Prisma + PostgreSQL (`apps/api`), React 19 + Vite + Tailwind
-(`apps/web`), shared zod schemas (`packages/shared`). Details for developers: [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md).
+(`apps/web`), shared zod schemas (`packages/shared`).

@@ -2,7 +2,7 @@
  * `pnpm mail`: a local mail catcher, so OTP password-reset emails work without Docker or a real
  * mail account. SMTP on :1025 accepts every message; http://localhost:8025 shows the inbox and
  * updates live. Mail is kept in memory only (the newest 200) and is gone when this stops.
- * Machines with Docker can run Mailpit from docker-compose.yml instead; it uses the same ports.
+ * If Mailpit is already running on these ports, it is used instead.
  */
 import 'dotenv/config';
 import http from 'node:http';
