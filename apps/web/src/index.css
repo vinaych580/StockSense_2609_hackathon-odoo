@@ -1,0 +1,117 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+/*
+ * StockSense design system. Dark only.
+ *
+ * - One brand colour, `accent` (#6ae4ff): links, active nav, icons, focus rings, primary button.
+ *   success / danger / warning are the only other colours, for stock data (IN, OUT or short, low).
+ * - Inter for UI text; JetBrains Mono (`eyebrow`, `ref` utilities) for section labels, references and SKUs.
+ * - 8px radius (`rounded-lg`) for cards, inputs and buttons; `rounded-full` only for status badges and tabs.
+ * - Flat: 1px hairline borders, no shadows. The shadow utilities are removed below.
+ *
+ * shadcn's own `accent` token means a neutral hover fill. Here it is the brand cyan, so after every
+ * `shadcn add`, replace `hover:bg-accent` / `focus:bg-accent` in the new component with `bg-elevated`,
+ * and drop any `shadow-*` classes.
+ */
+
+:root {
+  color-scheme: dark;
+  --radius: 8px;
+
+  --background: #0a0a0a;
+  --foreground: #ffffff;
+  --card: #141414;
+  --card-foreground: #ffffff;
+  --popover: #141414;
+  --popover-foreground: #ffffff;
+  --primary: #6ae4ff;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1e1e1e;
+  --secondary-foreground: #ffffff;
+  --muted: #1e1e1e;
+  --muted-foreground: #a7a7a7;
+  --accent: #6ae4ff;
+  --accent-foreground: #0a0a0a;
+  --destructive: #f87171;
+  --border: #313131;
+  --input: #313131;
+  --ring: #6ae4ff;
+}
+
+@theme {
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-shadow-*: initial;
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  /* Brand tokens */
+  --color-canvas: #0a0a0a;
+  --color-elevated: #1e1e1e;
+  --color-hairline: #313131;
+  --color-fg: #ffffff;
+  --color-muted: #a7a7a7;
+  --color-success: #34d399;
+  --color-danger: #f87171;
+  --color-warning: #fbbf24;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* shadcn semantic colours, backed by the variables above */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+/* Section labels: mono, uppercase, wide tracking, muted. */
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-muted);
+}
+
+/* Reference numbers and SKUs, e.g. WH1/IN/00012. */
+@utility ref {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+  a {
+    @apply text-accent;
+  }
+}
