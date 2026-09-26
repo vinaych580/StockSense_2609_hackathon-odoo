@@ -16,7 +16,9 @@ import { useFilterParams, useListParams } from '@/lib/listParams';
 import { useCategoryOptions, useLocationOptions, useWarehouseOptions } from '@/lib/masterDataStub';
 import { cn } from '@/lib/utils';
 
+import { KANBAN_PAGE_SIZE, OperationKanban } from './OperationKanban';
 import { infoForType } from './operationTypes';
+import { ViewToggle } from './ViewToggle';
 
 const FILTER_KEYS = ['search', 'status', 'warehouseId', 'locationId', 'categoryId', 'dateFrom', 'dateTo', 'late'] as const;
 
@@ -70,7 +72,7 @@ export function OperationListPage({ type }: { type: OperationType }) {
   const info = infoForType(type);
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { page, pageSize, sort, setPage, setSort } = useListParams({ defaultSort: '-createdAt' });
+  const { page, pageSize, sort, view, setPage, setSort, setView } = useListParams({ defaultSort: '-createdAt' });
   const filters = useFilterParams(FILTER_KEYS);
 
   const warehouses = useWarehouseOptions();
@@ -96,13 +98,16 @@ export function OperationListPage({ type }: { type: OperationType }) {
     }
   }, [filters.locationId, locations, setParams]);
 
+  // One query for both views; only the paging differs. The board takes everything up to the API's maximum.
+  const paging = view === 'kanban' ? { page: 1, pageSize: KANBAN_PAGE_SIZE } : { page, pageSize };
   const query = useQuery({
-    queryKey: ['operations', 'list', { type, ...filters, page, pageSize, sort }],
-    queryFn: () => api.list<OperationDto>('/operations', { type, ...filters, sort, page, pageSize }),
+    queryKey: ['operations', 'list', { type, ...filters, ...paging, sort }],
+    queryFn: () => api.list<OperationDto>('/operations', { type, ...filters, sort, ...paging }),
     placeholderData: keepPreviousData,
   });
 
   const filtered = Object.keys(filters).length > 0;
+  const emptyMessage = filtered ? `No ${info.plural} match these filters.` : `No ${info.plural} yet.`;
   const canCreate = !!user && canOperate(user.role, 'create', type);
   const columns = useMemo(() => columnsFor(info.hasPartner), [info.hasPartner]);
 
@@ -113,14 +118,17 @@ export function OperationListPage({ type }: { type: OperationType }) {
           <span className="eyebrow">Operations</span>
           <h1 className="text-2xl font-semibold">{info.title}</h1>
         </div>
-        {canCreate && (
-          <Button asChild>
-            <Link to={`/operations/${info.slug}/new`}>
-              <Plus />
-              New {info.noun}
-            </Link>
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          <ViewToggle view={view} onChange={setView} />
+          {canCreate && (
+            <Button asChild>
+              <Link to={`/operations/${info.slug}/new`}>
+                <Plus />
+                New {info.noun}
+              </Link>
+            </Button>
+          )}
+        </div>
       </header>
 
       <FilterBar>
@@ -133,24 +141,37 @@ export function OperationListPage({ type }: { type: OperationType }) {
         <FilterToggle name="late" label="Late" />
       </FilterBar>
 
-      <DataTable
-        aria-label={info.title}
-        columns={columns}
-        rows={query.data?.data}
-        getRowId={(op) => op.id}
-        page={query.data?.page}
-        sort={sort}
-        onSortChange={setSort}
-        onPageChange={setPage}
-        isLoading={query.isPending}
-        isFetching={query.isFetching}
-        error={query.error}
-        onRetry={() => void query.refetch()}
-        emptyMessage={filtered ? `No ${info.plural} match these filters.` : `No ${info.plural} yet.`}
-        errorMessage={`Couldn't load ${info.plural}.`}
-        onRowClick={(op) => navigate(`/operations/${info.slug}/${op.id}`)}
-        rowClassName={(op) => (op.isLate ? 'bg-danger/5 [&>td:first-child]:border-l-2 [&>td:first-child]:border-l-danger' : undefined)}
-      />
+      {view === 'kanban' ? (
+        <OperationKanban
+          info={info}
+          data={query.data}
+          isLoading={query.isPending}
+          isFetching={query.isFetching}
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          emptyMessage={emptyMessage}
+          statusFilter={filters.status}
+        />
+      ) : (
+        <DataTable
+          aria-label={info.title}
+          columns={columns}
+          rows={query.data?.data}
+          getRowId={(op) => op.id}
+          page={query.data?.page}
+          sort={sort}
+          onSortChange={setSort}
+          onPageChange={setPage}
+          isLoading={query.isPending}
+          isFetching={query.isFetching}
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          emptyMessage={emptyMessage}
+          errorMessage={`Couldn't load ${info.plural}.`}
+          onRowClick={(op) => navigate(`/operations/${info.slug}/${op.id}`)}
+          rowClassName={(op) => (op.isLate ? 'bg-danger/5 [&>td:first-child]:border-l-2 [&>td:first-child]:border-l-danger' : undefined)}
+        />
+      )}
     </div>
   );
 }

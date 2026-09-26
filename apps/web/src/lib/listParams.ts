@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router';
 
 const DEFAULT_PAGE_SIZE = 25;
 
+/** How a list page shows its rows: a table, or a board of status columns. */
+export type ListView = 'list' | 'kanban';
+
 function positiveInt(value: string | null, fallback: number, max = Number.MAX_SAFE_INTEGER) {
   const n = Number(value);
   return Number.isInteger(n) && n >= 1 ? Math.min(n, max) : fallback;
@@ -17,6 +20,7 @@ export function useListParams({ defaultSort, pageSize: defaultPageSize = DEFAULT
   const page = positiveInt(params.get('page'), 1);
   const pageSize = positiveInt(params.get('pageSize'), defaultPageSize, 100);
   const sort = params.get('sort') || defaultSort;
+  const view: ListView = params.get('view') === 'kanban' ? 'kanban' : 'list';
 
   const update = useCallback(
     (changes: Record<string, string | undefined>) =>
@@ -38,7 +42,10 @@ export function useListParams({ defaultSort, pageSize: defaultPageSize = DEFAULT
   // A new sort starts again at page 1.
   const setSort = useCallback((s: string) => update({ sort: s === defaultSort ? undefined : s, page: undefined }), [update, defaultSort]);
 
-  return { page, pageSize, sort, setPage, setSort };
+  // Filters, sort and the list's page are left alone, so switching back to the list finds them as they were.
+  const setView = useCallback((v: ListView) => update({ view: v === 'list' ? undefined : v }), [update]);
+
+  return { page, pageSize, sort, view, setPage, setSort, setView };
 }
 
 /** The current values of these filter params (empty ones left out), for a query key and the API query. */
