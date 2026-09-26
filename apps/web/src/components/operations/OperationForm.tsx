@@ -2,14 +2,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { OperationDto, OperationType } from '@stocksense/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { api } from '@/lib/api';
+import { api, isApiError } from '@/lib/api';
 import { applyServerError } from '@/lib/forms';
 import { useProductOptions, usePartnerOptions, useUserOptions } from '@/lib/masterDataStub';
 import { cn } from '@/lib/utils';
@@ -27,18 +27,21 @@ import {
 } from './formSchema';
 import { LinesEditor } from './LinesEditor';
 import { LocationSelect } from './LocationSelect';
+import { operationDetailKey } from './useOperationAction';
 
-export const operationDetailKey = (id: string) => ['operations', 'detail', id] as const;
+export { operationDetailKey };
+
 
 const selectClass =
   'h-9 w-full rounded-lg border border-hairline bg-canvas px-3 text-sm text-foreground outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-ring/30 aria-invalid:border-danger';
 
-type Props =
-  | { type: OperationType; mode: 'create'; operation?: undefined; notice?: string }
-  | { type: OperationType; mode: 'edit'; operation: OperationDto; notice?: string };
+type Props = { notice?: string; onDirtyChange?: (dirty: boolean) => void } & (
+  | { type: OperationType; mode: 'create'; operation?: undefined }
+  | { type: OperationType; mode: 'edit'; operation: OperationDto }
+);
 
 /** One form for all four types: creates a Draft, or edits one (PATCH with the version last read). */
-export function OperationForm({ type, mode, operation, notice }: Props) {
+export function OperationForm({ type, mode, operation, notice, onDirtyChange }: Props) {
   const info = infoForType(type);
   const partner = partnerFor(type);
   const counted = type === 'ADJUSTMENT';
@@ -56,7 +59,9 @@ export function OperationForm({ type, mode, operation, notice }: Props) {
     defaultValues: operation ? fromOperation(operation) : emptyValues(type),
   });
   const { register, control, formState, handleSubmit, reset, setError } = form;
-  const { errors, isSubmitting } = formState;
+  const { errors, isSubmitting, isDirty } = formState;
+
+  useEffect(() => onDirtyChange?.(isDirty), [isDirty, onDirtyChange]);
 
   const onSubmit = handleSubmit(async (values) => {
     setSaved(undefined);
@@ -74,6 +79,14 @@ export function OperationForm({ type, mode, operation, notice }: Props) {
         setSaved('Saved.');
       }
     } catch (e) {
+      if (mode === 'edit' && isApiError(e, 'STALE_VERSION')) {
+        // Load their version (and its `version`) behind the user's edits, which stay on screen.
+        await queryClient.refetchQueries({ queryKey: operationDetailKey(operation.id), exact: true });
+        setError('root.server', {
+          message: 'Someone else changed this Draft. Their version is loaded behind your edits; save again to keep yours.',
+        });
+        return;
+      }
       // Line errors come back as lines.N.countedQuantity for adjustments; the form calls that field `quantity`.
       applyServerError((path, error) => setError(formPath(String(path)) as never, error), e);
     }

@@ -212,14 +212,16 @@ describe('OperationForm: edit', () => {
     await user.type(await screen.findByLabelText('Notes'), ' more');
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('changed by someone else');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Someone else changed this Draft');
     expect(screen.getByLabelText('Notes')).toHaveValue('C6 check more');
   });
 
   it('shows Staff a Draft receipt read-only', async () => {
     setup('/operations/receipts/op-new', staff, { 'GET /operations/op-new': [200, { data: draft() }] });
-    expect(await screen.findByText('Your role can view this Draft but not edit it.')).toBeInTheDocument();
+    // Staff can't edit a receipt, but can receive it: the detail view with Validate only.
+    expect(await screen.findByRole('button', { name: 'Validate' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
   });
 
   it('lets Staff edit a Draft transfer', async () => {
@@ -229,11 +231,11 @@ describe('OperationForm: edit', () => {
     expect(await screen.findByRole('button', { name: 'Save draft' })).toBeInTheDocument();
   });
 
-  it('shows the placeholder for a document past Draft', async () => {
+  it('shows the read-only detail view for a document past Draft', async () => {
     setup('/operations/receipts/op-r', manager, { 'GET /operations/op-r': [200, { data: draft({ id: 'op-r', status: 'READY' }) }] });
-    const header = await screen.findByText(/Receipt detail/);
-    expect(header).toBeInTheDocument();
-    expect(within(screen.getByRole('main')).getByText('Ready')).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Status' })).toBeInTheDocument();
+    expect(within(screen.getByRole('main')).getAllByText('Ready').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
   });
 
   it('moves a link with the wrong type to the right one', async () => {
