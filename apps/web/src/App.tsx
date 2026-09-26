@@ -1,4 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router';
+import { ProductCreatePage } from '@/pages/ProductCreatePage';
+import { ProductDetailsPage } from '@/pages/ProductDetailsPage';
+import { ProductCategoriesPage } from '@/pages/ProductCategoriesPage';
+import { ProductsPage } from '@/pages/ProductsPage';
 import { QuickCountPage } from '@/pages/QuickCountPage';
 import { RequireAuth } from '@/auth/RequireAuth';
 import { AppShell } from '@/components/layout/AppShell';
@@ -34,6 +38,9 @@ export function App() {
           ))}
           <Route path="/operations/:slug/new" element={<OperationDetailPlaceholder isNew />} />
           <Route path="/operations/:slug/:id" element={<OperationDetailPlaceholder />} />
+          <Route path="/products/new" element={<ProductCreatePage />} />
+          <Route path="/products/categories" element={<ProductCategoriesPage />} />
+          <Route path="/products/:id" element={<ProductDetailsPage />} />
           {PLACEHOLDERS.map((p) => (
             <Route key={p.path} path={p.path} element={<PlaceholderPage title={p.title} task={p.task} />} />
           ))}
