@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import type { StockRowDto } from '@stocksense/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';

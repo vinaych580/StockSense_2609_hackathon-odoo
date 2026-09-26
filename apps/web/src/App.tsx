@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router';
-
+import { QuickCountPage } from '@/pages/QuickCountPage';
 import { RequireAuth } from '@/auth/RequireAuth';
 import { AppShell } from '@/components/layout/AppShell';
 import { LoginPage } from '@/pages/LoginPage';
