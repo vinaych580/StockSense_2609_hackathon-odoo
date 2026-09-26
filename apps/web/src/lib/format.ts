@@ -7,3 +7,10 @@ const dateFormat = new Intl.DateTimeFormat('en-IN', { timeZone: APP_TIMEZONE, da
 export function formatDate(iso: string | null | undefined) {
   return iso ? dateFormat.format(new Date(iso)) : '—';
 }
+
+const inputFormat = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/** YYYY-MM-DD in APP_TIMEZONE, for <input type="date"> and the API's date fields. */
+export function toDateInput(iso: string) {
+  return inputFormat.format(new Date(iso));
+}

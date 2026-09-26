@@ -1,4 +1,4 @@
-import type { OperationType } from '@stocksense/shared';
+import { type OperationType, type PartnerKind, PARTNER_RULES } from '@stocksense/shared';
 
 export interface OperationTypeInfo {
   type: OperationType;
@@ -19,6 +19,12 @@ export const OPERATION_TYPE_INFO: OperationTypeInfo[] = [
   { type: 'TRANSFER', slug: 'transfers', title: 'Transfers', noun: 'transfer', plural: 'transfers', hasPartner: false, canWait: true },
   { type: 'ADJUSTMENT', slug: 'adjustments', title: 'Adjustments', noun: 'adjustment', plural: 'adjustments', hasPartner: false, canWait: false },
 ];
+
+/** The contact a type takes, if any: receipts a supplier, deliveries a customer (PARTNER_RULES). */
+export function partnerFor(type: OperationType): { kind: PartnerKind; label: string } | undefined {
+  const kind = PARTNER_RULES[type];
+  return kind && { kind, label: kind === 'SUPPLIER' ? 'Supplier' : 'Customer' };
+}
 
 export const infoForType = (type: OperationType) => OPERATION_TYPE_INFO.find((i) => i.type === type)!;
 export const infoForSlug = (slug: string | undefined) => OPERATION_TYPE_INFO.find((i) => i.slug === slug);
