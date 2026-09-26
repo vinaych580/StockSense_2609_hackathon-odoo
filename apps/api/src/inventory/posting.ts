@@ -7,7 +7,7 @@
  *   create missing balance rows at 0 (sorted) → every balance key FOR UPDATE (sorted) →
  *   compute in memory → write.
  */
-import type { ChangedBalance, OperationStatus, OperationType, ShortLine } from '@stocksense/shared';
+import type { ChangedBalance, OperationStatus, OperationType, PostResult, ShortLine } from '@stocksense/shared';
 import { Prisma } from '@prisma/client';
 import type { Tx } from '../lib/db';
 import { AppError } from '../lib/errors';
@@ -26,13 +26,7 @@ export interface PostOptions {
   acknowledgeBalanceChange?: boolean;
 }
 
-export interface PostResult {
-  movesPosted: number;
-  /** Adjustment lines whose count matched the balance, so nothing was posted. */
-  unchangedLines: number;
-  productIds: string[];
-  warehouseIds: string[];
-}
+export type { PostResult } from '@stocksense/shared';
 
 export interface OpRow {
   id: string;

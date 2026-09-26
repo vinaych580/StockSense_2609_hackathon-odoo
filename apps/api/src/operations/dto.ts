@@ -1,4 +1,4 @@
-import { OUTGOING_TYPES, type OperationStatus, type OperationType, type Uom } from '@stocksense/shared';
+import { OUTGOING_TYPES, type OperationDto } from '@stocksense/shared';
 import { Prisma } from '@prisma/client';
 import type { Tx } from '../lib/db';
 import { prisma } from '../lib/db';
@@ -6,49 +6,9 @@ import { AppError } from '../lib/errors';
 import { isLate } from '../lib/time';
 import { balancesAt } from '../inventory/references';
 
+export type { OperationDto, OperationLineDto } from '@stocksense/shared';
+
 const q = (d: Prisma.Decimal | null | undefined) => (d == null ? null : new Prisma.Decimal(d).toFixed(3));
-
-export interface OperationLineDto {
-  id: string;
-  productId: string;
-  sku: string;
-  productName: string;
-  uom: Uom;
-  productActive: boolean;
-  quantity: string | null;
-  countedQuantity: string | null;
-  balanceAtCount: string | null;
-  postedQuantity: string | null;
-  /** Current balance at the internal end that the line draws from (source for outgoing, counted location for adjustments). */
-  onHand: string | null;
-  /** Outgoing lines only, before Done: how much is missing at the source. The form shows these red. */
-  shortBy: string | null;
-}
-
-export interface OperationDto {
-  id: string;
-  reference: string;
-  type: OperationType;
-  status: OperationStatus;
-  version: number;
-  warehouseId: string;
-  source: { id: string; label: string; type: string };
-  dest: { id: string; label: string; type: string };
-  partner: { id: string; name: string } | null;
-  responsible: { id: string; name: string } | null;
-  scheduledDate: string | null;
-  isLate: boolean;
-  pickedAt: string | null;
-  packedAt: string | null;
-  notes: string | null;
-  createdBy: { id: string; name: string };
-  validatedBy: { id: string; name: string } | null;
-  validatedAt: string | null;
-  canceledBy: { id: string; name: string } | null;
-  canceledAt: string | null;
-  createdAt: string;
-  lines: OperationLineDto[];
-}
 
 const include = {
   lines: { include: { product: true }, orderBy: { product: { sku: 'asc' } } },

@@ -3,6 +3,8 @@
 Multi-warehouse inventory management for the Odoo hackathon. Every stock change is a validated
 document (receipt, delivery, transfer, adjustment) that posts to an append-only stock ledger.
 
+**New to the team? Read [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) first:** setup, who owns what, contracts and git rules.
+
 ## Setup
 
 Needs Node 22+ and pnpm 10 (`npm i -g pnpm@10`). No Docker required.

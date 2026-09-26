@@ -15,6 +15,7 @@ import {
   UOM_DECIMALS,
   type OperationAction,
   type OperationActionInput,
+  type OperationActionResponse,
   type OperationCapability,
   type OperationCreateInput,
   type OperationLineInput,
@@ -178,13 +179,8 @@ export async function updateOperation(actor: Actor, id: string, input: Operation
 
 export type ActionName = Exclude<OperationAction, 'edit'>;
 
-export interface ActionResult {
-  operation: OperationDto;
-  /** Set by validate. */
-  posted?: PostResult;
-  /** A repeat Validate by the same user after the first succeeded: nothing new happened. */
-  replayed?: boolean;
-}
+/** The response of every action; the shape lives in packages/shared. */
+export type ActionResult = OperationActionResponse;
 
 export async function runAction(
   actor: Actor,
