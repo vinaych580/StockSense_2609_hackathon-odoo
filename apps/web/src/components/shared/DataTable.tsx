@@ -32,6 +32,8 @@ export interface DataTableProps<T> {
   emptyMessage?: ReactNode;
   errorMessage?: ReactNode;
   onRowClick?: (row: T) => void;
+  /** Extra classes and a data attribute per row, e.g. to mark late documents. */
+  rowClassName?: (row: T) => string | undefined;
   skeletonRows?: number;
   'aria-label'?: string;
 }
@@ -63,6 +65,7 @@ export function DataTable<T>({
   emptyMessage = 'Nothing here yet.',
   errorMessage = "Couldn't load this list.",
   onRowClick,
+  rowClassName,
   skeletonRows = 5,
   'aria-label': ariaLabel,
 }: DataTableProps<T>) {
@@ -147,7 +150,7 @@ export function DataTable<T>({
                 <tr
                   key={getRowId(row)}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  className={cn('border-t border-hairline', onRowClick && 'cursor-pointer hover:bg-elevated')}
+                  className={cn('border-t border-hairline', onRowClick && 'cursor-pointer hover:bg-elevated', rowClassName?.(row))}
                 >
                   {columns.map((col) => (
                     <td key={col.id} className={cn('h-11 px-4', col.align === 'right' && 'text-right', col.className)}>
