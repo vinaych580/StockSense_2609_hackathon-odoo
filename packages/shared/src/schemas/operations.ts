@@ -1,0 +1,85 @@
+import { z } from 'zod';
+import { OPERATION_TYPES, type OperationType } from '../enums';
+import { QUANTITY_PATTERN } from '../quantity';
+
+const id = z.uuid();
+
+/** A non-negative decimal string within numeric(14,3). */
+export const quantityString = z
+  .string()
+  .trim()
+  .regex(QUANTITY_PATTERN, 'Use a number with at most 3 decimals, up to 99,999,999,999.999');
+
+const positiveQuantity = quantityString.refine((v) => Number(v) > 0, 'Quantity must be more than 0');
+
+export const operationLineInput = z.object({
+  productId: id,
+  /** Receipts, deliveries and transfers: the quantity to move. */
+  quantity: positiveQuantity.optional(),
+  /** Adjustments: the counted quantity (0 is a valid count). */
+  countedQuantity: quantityString.optional(),
+});
+export type OperationLineInput = z.infer<typeof operationLineInput>;
+
+const headerFields = {
+  sourceLocationId: id,
+  destLocationId: id,
+  partnerId: id.nullish(),
+  responsibleId: id.nullish(),
+  scheduledDate: z.coerce.date().nullish(),
+  notes: z.string().trim().max(2000).nullish(),
+};
+
+const lines = z
+  .array(operationLineInput)
+  .max(200)
+  .refine(
+    (ls) => new Set(ls.map((l) => l.productId)).size === ls.length,
+    'The same product appears on two lines; merge them',
+  );
+
+/** Which quantity field a line needs is decided by the document type. */
+export function checkLinesForType(
+  type: OperationType,
+  ls: OperationLineInput[],
+  ctx: z.RefinementCtx,
+): void {
+  ls.forEach((l, i) => {
+    if (type === 'ADJUSTMENT') {
+      if (l.countedQuantity === undefined)
+        ctx.addIssue({ code: 'custom', path: ['lines', i, 'countedQuantity'], message: 'Enter the counted quantity' });
+      if (l.quantity !== undefined)
+        ctx.addIssue({ code: 'custom', path: ['lines', i, 'quantity'], message: 'Adjustments take a counted quantity, not a quantity' });
+    } else {
+      if (l.quantity === undefined)
+        ctx.addIssue({ code: 'custom', path: ['lines', i, 'quantity'], message: 'Enter a quantity' });
+      if (l.countedQuantity !== undefined)
+        ctx.addIssue({ code: 'custom', path: ['lines', i, 'countedQuantity'], message: 'Only adjustments take a counted quantity' });
+    }
+  });
+}
+
+export const operationCreateInput = z
+  .object({ type: z.enum(OPERATION_TYPES), ...headerFields, lines })
+  .superRefine((v, ctx) => {
+    if (v.sourceLocationId === v.destLocationId)
+      ctx.addIssue({ code: 'custom', path: ['destLocationId'], message: 'Source and destination must differ' });
+    checkLinesForType(v.type, v.lines, ctx);
+  });
+export type OperationCreateInput = z.infer<typeof operationCreateInput>;
+
+/** PATCH on a Draft: the full header and line list, plus the version last seen. The type can't change. */
+export const operationUpdateInput = z
+  .object({ ...headerFields, lines, version: z.int().nonnegative() })
+  .superRefine((v, ctx) => {
+    if (v.sourceLocationId === v.destLocationId)
+      ctx.addIssue({ code: 'custom', path: ['destLocationId'], message: 'Source and destination must differ' });
+  });
+export type OperationUpdateInput = z.infer<typeof operationUpdateInput>;
+
+export const operationActionInput = z.object({
+  version: z.int().nonnegative(),
+  /** Adjustments only: post counted − current even though the balance moved since counting. */
+  acknowledgeBalanceChange: z.boolean().optional(),
+});
+export type OperationActionInput = z.infer<typeof operationActionInput>;

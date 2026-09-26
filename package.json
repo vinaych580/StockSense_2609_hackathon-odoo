@@ -1,0 +1,18 @@
+{
+  "name": "stocksense",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "db:start": "pnpm --filter @stocksense/api db:start",
+    "db:migrate": "pnpm --filter @stocksense/api db:migrate",
+    "db:reset": "pnpm --filter @stocksense/api db:reset",
+    "db:check": "pnpm --filter @stocksense/api db:check",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "verify": "pnpm -r typecheck && pnpm -r test",
+    "db:seed": "pnpm --filter @stocksense/api db:seed"
+  }
+}
