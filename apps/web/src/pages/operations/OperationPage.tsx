@@ -1,19 +1,22 @@
 import { canOperate, type OperationDto } from '@stocksense/shared';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
 import { Link, Navigate, useLocation, useParams } from 'react-router';
 
 import { useAuth } from '@/auth/AuthProvider';
-import { OperationForm, operationDetailKey } from '@/components/operations/OperationForm';
+import { ActionBar } from '@/components/operations/ActionBar';
+import { OperationForm } from '@/components/operations/OperationForm';
+import { operationDetailKey, useOperationAction } from '@/components/operations/useOperationAction';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { api, isApiError } from '@/lib/api';
 import { NotFoundPage } from '@/pages/StatusPage';
 
-import { OperationDetailPlaceholder } from './OperationDetailPlaceholder';
+import { OperationDetail } from './OperationDetail';
 import { infoForSlug, infoForType } from './operationTypes';
 
-/** /operations/:slug/:id: a Draft the user may edit opens in the form; anything else waits for C7's detail view. */
+/** /operations/:slug/:id: a Draft the user may edit opens in the form with its actions; anything else in the detail view. */
 export function OperationPage() {
   const { slug, id = '' } = useParams();
   const { user } = useAuth();
@@ -24,6 +27,10 @@ export function OperationPage() {
     enabled: !!infoForSlug(slug),
     retry: (count, e) => !isApiError(e, 'NOT_FOUND') && !isApiError(e, 'VALIDATION_FAILED') && count < 1,
   });
+
+  // Here, not in the branches: an action can move a Draft into the detail view, and its outcome must stay on screen.
+  const actions = useOperationAction(id);
+  const [dirty, setDirty] = useState(false);
 
   if (!infoForSlug(slug) || isApiError(query.error, 'NOT_FOUND') || isApiError(query.error, 'VALIDATION_FAILED')) return <NotFoundPage />;
   if (query.isPending) {
@@ -51,12 +58,10 @@ export function OperationPage() {
   // A link with the wrong type in the path goes to the right one.
   if (info.slug !== slug) return <Navigate to={`/operations/${info.slug}/${op.id}`} replace />;
 
-  if (op.status !== 'DRAFT' || !user || !canOperate(user.role, 'edit', op.type)) {
-    return <OperationDetailPlaceholder operation={op} />;
-  }
+  const editable = op.status === 'DRAFT' && !!user && canOperate(user.role, 'edit', op.type);
 
   return (
-    <div className="flex max-w-4xl flex-col gap-6">
+    <div className="flex max-w-5xl flex-col gap-6">
       <header className="flex flex-col gap-2">
         <Link to={`/operations/${info.slug}`} className="inline-flex items-center gap-1.5 text-sm">
           <ArrowLeft className="size-4" />
@@ -67,8 +72,15 @@ export function OperationPage() {
           <StatusBadge status={op.status} />
         </div>
       </header>
-      {/* Keyed by id so moving between documents starts a fresh form. */}
-      <OperationForm key={op.id} type={op.type} mode="edit" operation={op} notice={state?.notice} />
+      {editable ? (
+        <>
+          <ActionBar operation={op} actions={actions} disabledReason={dirty ? 'Save your changes first.' : undefined} />
+          {/* Keyed by id so moving between documents starts a fresh form. */}
+          <OperationForm key={op.id} type={op.type} mode="edit" operation={op} notice={state?.notice} onDirtyChange={setDirty} />
+        </>
+      ) : (
+        <OperationDetail operation={op} actions={actions} />
+      )}
     </div>
   );
 }
