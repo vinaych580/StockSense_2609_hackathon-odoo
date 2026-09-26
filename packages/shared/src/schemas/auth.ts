@@ -25,3 +25,13 @@ export const passwordForgotInput = z.object({ email: emailInput });
 export const passwordVerifyInput = z.object({ email: emailInput, code: otpCode });
 export const passwordResetInput = z.object({ email: emailInput, code: otpCode, newPassword });
 export type PasswordResetInput = z.infer<typeof passwordResetInput>;
+
+/** PATCH /auth/me: the signed-in user's own profile. Email is the log-in identity and doesn't change here. */
+export const profileUpdateInput = z.object({ name: z.string().trim().min(1, 'Enter your name').max(120) });
+export type ProfileUpdateInput = z.infer<typeof profileUpdateInput>;
+
+/** POST /auth/me/password: change the password while logged in. */
+export const passwordChangeInput = z
+  .object({ currentPassword: z.string().min(1, 'Enter your current password').max(128), newPassword })
+  .refine((v) => v.currentPassword !== v.newPassword, { path: ['newPassword'], message: 'Choose a password different from the current one' });
+export type PasswordChangeInput = z.infer<typeof passwordChangeInput>;

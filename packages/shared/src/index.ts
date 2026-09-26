@@ -7,3 +7,5 @@ export * from './schemas/operations';
 export * from './schemas/auth';
 export * from './schemas/stock';
 export * from './dto';
+export * from './schemas/masterdata';
+export * from './schemas/dashboard';

@@ -114,3 +114,149 @@ export interface MoveDto {
   direction: 'IN' | 'OUT' | 'INTERNAL';
   doneBy: { id: string; name: string };
 }
+
+// ─── Master data ───────────────────────────────────────────────────────────────────────────
+
+export interface CategoryDto {
+  id: string;
+  name: string;
+  isActive: boolean;
+  productCount: number;
+}
+
+export interface ProductDto {
+  id: string;
+  sku: string;
+  name: string;
+  uom: Uom;
+  unitCost: string | null;
+  isActive: boolean;
+  category: { id: string; name: string } | null;
+  /** Sum over internal locations (within the warehouse filter, on lists that take one). */
+  onHand: string;
+  /**
+   * Dashboard definitions: out = on hand 0, low = a reorder rule at or under its minimum.
+   * Null for archived products, and on a warehouse-filtered list for products that warehouse doesn't carry.
+   */
+  stockStatus: 'ok' | 'low' | 'out' | null;
+  /** GET /products/:id only: balance per internal location that has ever held the product. */
+  locations?: Array<{ locationId: string; label: string; warehouseId: string; onHand: string }>;
+  /** False once the product is on any operation line: its unit can no longer change. */
+  uomEditable: boolean;
+  reorderRules: ReorderRuleDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LocationDto {
+  id: string;
+  code: string;
+  name: string;
+  /** "WH1/Stock", or the bare name for virtual locations. */
+  label: string;
+  type: LocationType;
+  warehouseId: string | null;
+  /** False when archived itself or its warehouse is archived. */
+  isActive: boolean;
+}
+
+export interface WarehouseDto {
+  id: string;
+  code: string;
+  name: string;
+  address: string | null;
+  isActive: boolean;
+  /** False once the warehouse has documents: references like WH1/IN/00001 embed it. */
+  codeEditable: boolean;
+  locations: LocationDto[];
+}
+
+export interface PartnerDto {
+  id: string;
+  name: string;
+  kind: 'SUPPLIER' | 'CUSTOMER';
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  isActive: boolean;
+}
+
+export interface ReorderRuleDto {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  warehouseCode: string;
+  minQty: string;
+  maxQty: string;
+}
+
+/** One problem in an imported CSV. `row` is the 1-based line in the file (the header is row 1). */
+export interface ImportIssue {
+  row: number;
+  column?: string;
+  message: string;
+}
+
+export interface ProductImportResult {
+  dryRun: boolean;
+  rows: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  categoriesCreated: string[];
+  /** Adjustment documents that posted initial stock for new products. */
+  stockOperations: string[];
+  errors: ImportIssue[];
+  warnings: ImportIssue[];
+}
+
+// ─── Dashboard ─────────────────────────────────────────────────────────────────────────────
+
+/** One reorder rule that is at or under its minimum. */
+export interface LowStockRuleDto {
+  warehouseId: string;
+  warehouseCode: string;
+  onHand: string;
+  minQty: string;
+  maxQty: string;
+  /** max − on hand: the quantity a replenishing receipt would bring in. */
+  suggestedQty: string;
+}
+
+/** One product in the dashboard's low- or out-of-stock list. */
+export interface StockAlertDto {
+  productId: string;
+  sku: string;
+  name: string;
+  uom: Uom;
+  category: { id: string; name: string } | null;
+  status: 'low' | 'out';
+  /** Within the dashboard's warehouse filter. */
+  onHand: string;
+  /** The rules at or under their minimum (empty for an out-of-stock product without rules). */
+  rules: LowStockRuleDto[];
+}
+
+export interface DashboardDto {
+  filters: { warehouseId: string | null; locationId: string | null; categoryId: string | null };
+  kpis: {
+    productsInStock: number;
+    lowStock: number;
+    outOfStock: number;
+    pendingReceipts: { total: number; late: number };
+    pendingDeliveries: { total: number; late: number; waiting: number };
+    scheduledTransfers: { total: number; late: number };
+  };
+  /** Low first, then out; each sorted by SKU. The sidebar badge is lowStock + outOfStock. */
+  alerts: StockAlertDto[];
+  generatedAt: string;
+}
+
+export interface UserDto {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  createdAt: string;
+}

@@ -93,4 +93,7 @@ export const api = {
     (await request<{ data: T } | undefined>('POST', path, { body }))?.data as T,
   patch: async <T>(path: string, body: unknown) =>
     (await request<{ data: T }>('PATCH', path, { body })).data,
+  put: async <T>(path: string, body: unknown) =>
+    (await request<{ data: T }>('PUT', path, { body })).data,
+  delete: (path: string) => request<void>('DELETE', path),
 };

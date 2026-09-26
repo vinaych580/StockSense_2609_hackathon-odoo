@@ -15,7 +15,8 @@ plan doc (ask Vinay for the link); this guide is the part you need at the keyboa
 | Shared contracts: enums, error codes, permissions, transitions, operation and stock schemas, response types | **Done** for operations and stock; master-data schemas still to add |
 | Express app: error handler, rate limits, Origin check, sign-up, log-in, `/me`, log-out, sessions | **Done** (Vinay) |
 | `/api/v1/operations` (all routes and list filters), `GET /stock` (with Free to use and forecast), `GET /moves` | **Done** (Vinay) |
-| Master-data APIs, product initial stock, dashboard KPIs, OTP reset, SSE | **Next** (Vinay, Track B) |
+| Master-data APIs, product initial stock, CSV import, OTP reset | **Done** (Vinay, Track B) |
+| Dashboard KPIs, SSE, users admin, profile | **Done** (Vinay, Track B) |
 | Web app (`apps/web`) | **Not started** (Tracks C and D) |
 
 `pnpm verify` passes on every branch below. The code is on `feat/a-stock-core` and the branches
@@ -134,8 +135,27 @@ maps the negative-stock CHECK to 409 `INSUFFICIENT_STOCK`, and every other named
 add new CHECKs there, or they come back as 500). Auth is done too: sign-up (always STAFF), log-in,
 `/me`, log-out, with passwords hashed by `@node-rs/argon2`.
 
-**Next:** master-data APIs with archive and restore, product creation with initial stock, the
-dashboard KPIs, OTP reset through Mailpit, and SSE. Rules for them (from the code review):
+**Done too:** master-data APIs in `apps/api/src/masterdata/` (products, categories, warehouses,
+locations, contacts, reorder rules) with archive/restore, product creation with initial stock, and
+`POST /products/import` (CSV in a JSON body `{ csv, dryRun, updateExisting }`; all-or-nothing; template at
+`GET /products/import/template`).
+
+OTP password reset is done: `POST /auth/password/forgot` (always 202), `/password/verify` (optional
+check), `/password/reset` (sets the password, ends every session, signs this browser in). Codes are
+6 digits, stored as argon2 hashes, valid 10 minutes, 5 wrong tries, single use. Mail goes through
+`src/lib/mailer.ts` (nodemailer → Mailpit); without Mailpit the email is printed to the API log.
+
+Also done: `GET /dashboard` (KPIs + low/out alerts, `warehouseId`/`locationId`/`categoryId`; a
+document counts under a warehouse or location if either end is there, and `GET /operations?warehouseId=`
+matches the same way, so a WH1 → WH2 transfer shows under both) and
+`GET /dashboard/integrity` (Managers), one stock-health definition in `src/inventory/health.ts` shared
+with `GET /products?stockStatus=low,out&warehouseId=`; `GET /events` (SSE: `ready`, `data.changed`,
+`session.updated`, `session.ended`; 25 s heartbeat that re-checks the session); `GET /users`,
+`PATCH /users/:id` (last-Manager rule, deactivation ends sessions); `PATCH /auth/me` (name) and
+`POST /auth/me/password` (ends other sessions). Decision on "Out of stock" with a warehouse filter:
+only products that warehouse carries (a reorder rule there, or it has held stock there) count.
+
+**Next:** one-click Replenish. Rules for them (from the code review):
 
 - **Archiving a warehouse:** lock its locations `FOR UPDATE`, refuse with 409 `IN_USE` if any holds
   stock, and archive its locations in the same transaction. Documents already treat a location in

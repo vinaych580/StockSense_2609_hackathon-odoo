@@ -19,6 +19,16 @@ function lateWhere(late: boolean): Prisma.OperationWhereInput {
 /** Filters for GET /operations; the dashboard's operations panel reuses them. */
 export function operationWhere(q: Omit<OperationListQuery, 'sort' | 'page' | 'pageSize'>): Prisma.OperationWhereInput {
   const and: Prisma.OperationWhereInput[] = [];
+  // Its own warehouse or either end's, as the dashboard counts it: a WH1 → WH2 transfer shows under both.
+  if (q.warehouseId) {
+    and.push({
+      OR: [
+        { warehouseId: q.warehouseId },
+        { sourceLocation: { warehouseId: q.warehouseId } },
+        { destLocation: { warehouseId: q.warehouseId } },
+      ],
+    });
+  }
   if (q.locationId) and.push({ OR: [{ sourceLocationId: q.locationId }, { destLocationId: q.locationId }] });
   if (q.categoryId) and.push({ lines: { some: { product: { categoryId: q.categoryId } } } });
   if (q.search) {
@@ -41,7 +51,6 @@ export function operationWhere(q: Omit<OperationListQuery, 'sort' | 'page' | 'pa
   return {
     type: q.type ? { in: q.type } : undefined,
     status: q.status ? { in: q.status } : undefined,
-    warehouseId: q.warehouseId,
     AND: and,
   };
 }

@@ -187,6 +187,16 @@ describe('GET /operations', () => {
     expect(await ids('late=true')).toEqual([late.id]);
   });
 
+  it('lists a transfer between warehouses under both, as the dashboard counts it', async () => {
+    const { agent, actor, product, stock, warehouse, wh2 } = await listSetup();
+    const across = await draft(actor, 'TRANSFER', stock.id, wh2.stock.id, [{ productId: product.id, quantity: '1' }]);
+    const ids = async (q: string) => (await agent.get(`/api/v1/operations?type=TRANSFER&${q}`)).body.data.map((o: { id: string }) => o.id);
+    expect(await ids(`warehouseId=${wh2.warehouse.id}`)).toEqual([across.id]);
+    expect(await ids(`warehouseId=${warehouse.id}`)).toContain(across.id);
+    const kpis = (await agent.get(`/api/v1/dashboard?warehouseId=${wh2.warehouse.id}`)).body.data.kpis;
+    expect(kpis.scheduledTransfers.total).toBe(1);
+  });
+
   it('late=false keeps open documents that have no scheduled date', async () => {
     const { agent, future, other, transfer } = await listSetup();
     const ids = (await agent.get('/api/v1/operations?late=false')).body.data.map((o: { id: string }) => o.id).sort();

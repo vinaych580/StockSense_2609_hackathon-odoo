@@ -1,33 +1,48 @@
-import type { FieldValues, Path, UseFormSetError } from 'react-hook-form';
-
+import type { z } from 'zod';
+import { toast } from 'sonner';
+import { useAuth } from '@/auth/AuthProvider';
 import { isApiError } from './api';
 
-interface FieldIssue {
-  path: string;
-  message: string;
+export type Errors = Partial<Record<string, string>>;
+
+/** First message per field path ("sku", "lines.0.quantity"). */
+export function issuesToErrors(issues: { path: PropertyKey[] | string; message: string }[]): Errors {
+  const out: Errors = {};
+  for (const i of issues) {
+    const key = Array.isArray(i.path) ? i.path.map(String).join('.') : String(i.path);
+    out[key] ??= i.message;
+  }
+  return out;
 }
 
-function fieldIssues(details: unknown): FieldIssue[] {
-  if (!Array.isArray(details)) return [];
-  return details.filter(
-    (d): d is FieldIssue => typeof d?.path === 'string' && d.path !== '' && typeof d?.message === 'string',
-  );
+/** Client-side check with a shared zod schema; returns the parsed value or field errors. */
+export function check<S extends z.ZodType>(schema: S, value: unknown): { data: z.output<S>; errors: null } | { data: null; errors: Errors } {
+  const r = schema.safeParse(value);
+  return r.success ? { data: r.data, errors: null } : { data: null, errors: issuesToErrors(r.error.issues) };
 }
 
 /**
- * Puts a failed request's error onto a React Hook Form form: VALIDATION_FAILED becomes field errors,
- * anything else becomes `root.server` for an inline alert. Returns the ApiError code, if any.
+ * Turn a failed write into field errors where the API names a field, otherwise a toast.
+ * Returns the field errors (empty when the error was toasted).
  */
-export function applyServerError<T extends FieldValues>(setError: UseFormSetError<T>, err: unknown) {
-  if (!isApiError(err)) {
-    setError('root.server', { message: 'Something went wrong. Try again.' });
-    return undefined;
+export function apiErrors(e: unknown, fieldFor: Partial<Record<string, string>> = {}): Errors {
+  if (isApiError(e)) {
+    const details = e.error.details;
+    if (Array.isArray(details) && details.length) return issuesToErrors(details as { path: string; message: string }[]);
+    const field = fieldFor[e.error.code];
+    if (field) return { [field]: e.error.message };
+    toast.error(e.error.message);
+    return {};
   }
-  const issues = err.error.code === 'VALIDATION_FAILED' ? fieldIssues(err.error.details) : [];
-  if (issues.length > 0) {
-    for (const issue of issues) setError(issue.path as Path<T>, { message: issue.message });
-  } else {
-    setError('root.server', { message: err.error.message });
-  }
-  return err.error.code;
+  toast.error('Something went wrong. Try again.');
+  return {};
+}
+
+export function useCan() {
+  const { user } = useAuth();
+  return {
+    user,
+    editMaster: !!user?.permissions.includes('masterdata.edit'),
+    manager: user?.role === 'MANAGER',
+  };
 }

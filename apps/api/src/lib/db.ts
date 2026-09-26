@@ -35,12 +35,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * $transaction call: Postgres refuses further queries in a failed transaction, so retrying
  * inside the callback can't work. After 3 retries a retryable failure becomes 503 BUSY_RETRY.
  */
-export async function withTx<T>(fn: (tx: Tx, ctx: TxContext) => Promise<T>): Promise<T> {
+export async function withTx<T>(fn: (tx: Tx, ctx: TxContext) => Promise<T>, opts: { timeout?: number } = {}): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     const pending: AppEvent[] = [];
     const ctx: TxContext = { publishAfterCommit: (e) => pending.push(e) };
     try {
-      const result = await prisma.$transaction((tx) => fn(tx, ctx), TX_OPTIONS);
+      const result = await prisma.$transaction((tx) => fn(tx, ctx), { ...TX_OPTIONS, ...opts });
       for (const e of pending) publish(e);
       return result;
     } catch (err) {

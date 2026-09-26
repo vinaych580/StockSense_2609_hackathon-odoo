@@ -1,41 +1,58 @@
-import { Navigate, Route, Routes } from 'react-router';
+import { Navigate, Route, Routes, useLocation } from 'react-router';
+import { loginPath, useAuth } from './auth/AuthProvider';
+import { Mark, Shell } from './components/Shell';
+import { TYPE_META, TYPES } from './lib/domain';
+import { LoginPage, ResetPage, SignupPage } from './pages/AuthPages';
+import { FloorPage } from './pages/FloorPage';
+import { ContactsPage, WarehousesPage } from './pages/MasterPages';
+import { MovesPage } from './pages/MovesPage';
+import { OperationDetailPage, OperationFormPage, OperationListPage } from './pages/OperationPages';
+import { ProductRecordPage, StockTrayPage } from './pages/StockPages';
+import { TeamPage } from './pages/TeamPages';
 
-import { RequireAuth } from '@/auth/RequireAuth';
-import { AppShell } from '@/components/layout/AppShell';
-import { LoginPage } from '@/pages/LoginPage';
-import { PlaceholderPage } from '@/pages/PlaceholderPage';
-import { SignupPage } from '@/pages/SignupPage';
-import { ForbiddenPage, NotFoundPage } from '@/pages/StatusPage';
+function RequireAuth() {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+  if (isLoading)
+    return (
+      <div className="flex h-full items-center justify-center" role="status" aria-label="Loading">
+        <Mark className="size-10 animate-pulse" />
+      </div>
+    );
+  if (!user) return <Navigate to={loginPath(location.pathname + location.search)} replace />;
+  return <Shell />;
+}
 
-// Pages later tasks replace. `task` is the task-list id that builds each one.
-const PLACEHOLDERS = [
-  { path: '/dashboard', title: 'Dashboard', task: 'C10' },
-  { path: '/operations/receipts', title: 'Receipts', task: 'C5' },
-  { path: '/operations/deliveries', title: 'Deliveries', task: 'C5' },
-  { path: '/operations/transfers', title: 'Transfers', task: 'C5' },
-  { path: '/operations/adjustments', title: 'Adjustments', task: 'C5' },
-  { path: '/stock', title: 'Stock', task: 'D2' },
-  { path: '/products', title: 'Products', task: 'D4' },
-  { path: '/moves', title: 'Move History', task: 'C10' },
-  { path: '/settings', title: 'Settings', task: 'D5' },
-];
+function ManagerOnly({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  return user?.role === 'MANAGER' ? children : <Navigate to="/" replace />;
+}
 
 export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
-      <Route path="/403" element={<ForbiddenPage />} />
+      <Route path="/reset" element={<ResetPage />} />
       <Route element={<RequireAuth />}>
-        <Route element={<AppShell />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="/operations" element={<Navigate to="/operations/receipts" replace />} />
-          {PLACEHOLDERS.map((p) => (
-            <Route key={p.path} path={p.path} element={<PlaceholderPage title={p.title} task={p.task} />} />
-          ))}
-        </Route>
+        <Route index element={<FloorPage />} />
+        <Route path="stock" element={<StockTrayPage />} />
+        <Route path="stock/:productId" element={<ProductRecordPage />} />
+        <Route path="ledger" element={<MovesPage />} />
+        <Route path="moves" element={<Navigate to="/ledger" replace />} />
+        <Route path="warehouses" element={<WarehousesPage />} />
+        <Route path="contacts" element={<ContactsPage />} />
+        <Route path="team" element={<ManagerOnly><TeamPage /></ManagerOnly>} />
+        {TYPES.map((t) => (
+          <Route key={t} path={TYPE_META[t].path}>
+            <Route index element={<OperationListPage key={t} type={t} />} />
+            <Route path="new" element={<OperationFormPage key={`${t}-new`} type={t} />} />
+            <Route path=":id" element={<OperationDetailPage />} />
+            <Route path=":id/edit" element={<OperationFormPage key={`${t}-edit`} type={t} />} />
+          </Route>
+        ))}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
-      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

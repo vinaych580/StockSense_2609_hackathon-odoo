@@ -118,7 +118,10 @@ export function queryObject<T extends z.ZodRawShape>(shape: T) {
 export const OPERATION_SORTS = ['-createdAt', 'createdAt', '-scheduledDate', 'scheduledDate', '-reference', 'reference'] as const;
 export type OperationSort = (typeof OPERATION_SORTS)[number];
 
-/** GET /operations filters. `locationId` matches either end; `search` matches the reference or the contact's name. */
+/**
+ * GET /operations filters. `warehouseId` matches the document's warehouse or either end's (as the
+ * dashboard counts it); `locationId` matches either end; `search` matches the reference or the contact's name.
+ */
 export const operationListQuery = queryObject({
   type: csvOf(OPERATION_TYPES).optional(),
   status: csvOf(OPERATION_STATUSES).optional(),
