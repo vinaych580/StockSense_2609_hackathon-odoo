@@ -1,18 +1,20 @@
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { jsonResponse, manager, renderWithProviders } from '@/test/render';
 
 import { App } from './App';
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe('App', () => {
-  it('renders the home page with operation types from the shared package', () => {
-    render(
-      <MemoryRouter>
-        <App />
-      </MemoryRouter>,
-    );
-    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+  it('renders the home page for a signed-in user', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, { data: manager })));
+    renderWithProviders(<App />);
+
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(screen.getByText(/Maya Manager/)).toBeInTheDocument();
     expect(screen.getByText('RECEIPT')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Validate' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
   });
 });

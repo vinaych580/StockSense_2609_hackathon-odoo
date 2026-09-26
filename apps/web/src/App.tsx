@@ -1,16 +1,22 @@
 import { OPERATION_TYPES } from '@stocksense/shared';
 import { Route, Routes } from 'react-router';
 
+import { useAuth } from '@/auth/AuthProvider';
+import { RequireAuth } from '@/auth/RequireAuth';
 import { Button } from '@/components/ui/button';
 
 // Placeholder until the app shell (C3) lands: shows the theme and proves the shared package resolves.
 function Home() {
+  const { user, logout } = useAuth();
+
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-4 py-16">
       <header className="flex flex-col gap-2">
         <span className="eyebrow">StockSense</span>
         <h1 className="text-3xl font-semibold">Inventory, kept honest.</h1>
-        <p className="text-muted">The web app is running. Operations, stock and moves come next.</p>
+        <p className="text-muted">
+          Signed in as {user?.name} ({user?.role.toLowerCase()}). Operations, stock and moves come next.
+        </p>
       </header>
 
       <section className="flex flex-col gap-4 rounded-lg border border-hairline bg-card p-6">
@@ -30,9 +36,23 @@ function Home() {
         </ul>
         <div className="flex gap-3">
           <Button>Validate</Button>
-          <Button variant="outline">Cancel</Button>
+          <Button variant="outline" onClick={() => void logout()}>
+            Log out
+          </Button>
         </div>
       </section>
+    </main>
+  );
+}
+
+// Placeholder: C3 replaces this with the log-in and sign-up pages.
+function LoginPlaceholder() {
+  return (
+    <main className="grid min-h-screen place-items-center px-4">
+      <div className="flex flex-col items-center gap-2">
+        <span className="eyebrow">Log in</span>
+        <p className="text-muted">The log-in page arrives in C3.</p>
+      </div>
     </main>
   );
 }
@@ -40,7 +60,10 @@ function Home() {
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      <Route path="/login" element={<LoginPlaceholder />} />
+      <Route element={<RequireAuth />}>
+        <Route path="/" element={<Home />} />
+      </Route>
     </Routes>
   );
 }
