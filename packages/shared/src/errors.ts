@@ -11,6 +11,8 @@ export const ERROR_STATUS = {
   STALE_VERSION: 409,
   SKU_TAKEN: 409,
   EMAIL_TAKEN: 409,
+  /** Any other unique field (warehouse code, category name...); details.fields names it. */
+  ALREADY_EXISTS: 409,
   IN_USE: 409,
   INVALID_LOCATION_FOR_TYPE: 422,
   SAME_LOCATION: 422,

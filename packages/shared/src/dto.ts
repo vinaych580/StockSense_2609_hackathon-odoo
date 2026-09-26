@@ -2,7 +2,8 @@
  * Response shapes the API returns and the web app renders. Quantities are decimal strings
  * ("12.500"), dates are ISO strings. Every versioned record carries `version`; send it back on changes.
  */
-import type { LocationType, OperationStatus, OperationType, Uom } from './enums';
+import type { LocationType, OperationStatus, OperationType, Role, Uom } from './enums';
+import type { Permission } from './permissions';
 
 /** One item: { data }. Lists: { data, page }. Errors: see ErrorBody in errors.ts. */
 export interface ItemResponse<T> {
@@ -72,4 +73,14 @@ export interface OperationActionResponse {
   posted?: PostResult;
   /** A repeat Validate by the same user after the first succeeded: nothing new happened. */
   replayed?: boolean;
+}
+
+/** GET /auth/me, and the body of sign-up and log-in. */
+export interface MeDto {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  /** Every non-operation capability this role has; operation buttons use canOperate(). */
+  permissions: Permission[];
 }
