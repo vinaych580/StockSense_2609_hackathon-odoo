@@ -3,8 +3,9 @@ import { Navigate, Route, Routes } from 'react-router';
 import { RequireAuth } from '@/auth/RequireAuth';
 import { AppShell } from '@/components/layout/AppShell';
 import { LoginPage } from '@/pages/LoginPage';
-import { OperationDetailPlaceholder } from '@/pages/operations/OperationDetailPlaceholder';
+import { NewOperationPage } from '@/pages/operations/NewOperationPage';
 import { OperationListPage } from '@/pages/operations/OperationListPage';
+import { OperationPage } from '@/pages/operations/OperationPage';
 import { OPERATION_TYPE_INFO } from '@/pages/operations/operationTypes';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 import { SignupPage } from '@/pages/SignupPage';
@@ -32,8 +33,8 @@ export function App() {
           {OPERATION_TYPE_INFO.map((info) => (
             <Route key={info.slug} path={`/operations/${info.slug}`} element={<OperationListPage key={info.type} type={info.type} />} />
           ))}
-          <Route path="/operations/:slug/new" element={<OperationDetailPlaceholder isNew />} />
-          <Route path="/operations/:slug/:id" element={<OperationDetailPlaceholder />} />
+          <Route path="/operations/:slug/new" element={<NewOperationPage />} />
+          <Route path="/operations/:slug/:id" element={<OperationPage />} />
           {PLACEHOLDERS.map((p) => (
             <Route key={p.path} path={p.path} element={<PlaceholderPage title={p.title} task={p.task} />} />
           ))}

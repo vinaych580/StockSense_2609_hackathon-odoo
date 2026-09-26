@@ -1,27 +1,29 @@
+import type { OperationDto } from '@stocksense/shared';
 import { ArrowLeft } from 'lucide-react';
-import { Link, useParams } from 'react-router';
+import { Link } from 'react-router';
 
-import { NotFoundPage } from '@/pages/StatusPage';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 
-import { infoForSlug } from './operationTypes';
+import { infoForType } from './operationTypes';
 
-/** Stands in for the operation form (C6) and detail view (C7) so list rows and New have somewhere to go. */
-export function OperationDetailPlaceholder({ isNew = false }: { isNew?: boolean }) {
-  const { slug, id } = useParams();
-  const info = infoForSlug(slug);
-  if (!info) return <NotFoundPage />;
-
+/** Stands in for the detail view and actions (C7) for documents that aren't editable Drafts. */
+export function OperationDetailPlaceholder({ operation: op }: { operation: OperationDto }) {
+  const info = infoForType(op.type);
   return (
     <div className="flex flex-col gap-4">
       <Link to={`/operations/${info.slug}`} className="inline-flex items-center gap-1.5 text-sm">
         <ArrowLeft className="size-4" />
         {info.title}
       </Link>
-      <div className="flex flex-col gap-1">
-        <span className="eyebrow">{isNew ? 'C6' : 'C6 / C7'}</span>
-        <h1 className="text-2xl font-semibold">{isNew ? `New ${info.noun}` : `${info.noun[0]!.toUpperCase()}${info.noun.slice(1)} detail`}</h1>
-        {!isNew && <p className="ref text-sm text-muted">{id}</p>}
-        <p className="text-muted">{isNew ? 'The operation form arrives in C6.' : 'The detail view arrives in C6 and C7.'}</p>
+      <div className="flex flex-col gap-2">
+        <span className="eyebrow">{info.noun[0]!.toUpperCase() + info.noun.slice(1)} detail · C7</span>
+        <div className="flex items-center gap-3">
+          <h1 className="ref text-2xl font-semibold">{op.reference}</h1>
+          <StatusBadge status={op.status} />
+        </div>
+        <p className="text-muted">
+          {op.status === 'DRAFT' ? 'Your role can view this Draft but not edit it.' : 'The detail view and actions arrive in C7.'}
+        </p>
       </div>
     </div>
   );

@@ -180,12 +180,6 @@ describe('OperationListPage', () => {
     const { user } = setup();
     await user.click(await screen.findByText('WH1/IN/00021'));
     expect(location()).toBe('/operations/receipts/op-3');
-    expect(await screen.findByRole('heading', { name: 'Receipt detail' })).toBeInTheDocument();
-  });
-
-  it('names the detail placeholder by the singular noun', async () => {
-    setup('/operations/deliveries/op-9');
-    expect(await screen.findByRole('heading', { name: 'Delivery detail' })).toBeInTheDocument();
   });
 
   it('shows 404 for an unknown operation type', async () => {
