@@ -1,7 +1,6 @@
 /**
  * Local Postgres without Docker: runs the PostgreSQL 16 binaries shipped in the
- * embedded-postgres package, with data in apps/api/.pgdata. Data lives
- * in apps/api/.pgdata; listens on PG_PORT (5433).
+ * embedded-postgres package, with data in apps/api/.pgdata, on PG_PORT (5433).
  */
 import { existsSync } from 'node:fs';
 import net from 'node:net';
