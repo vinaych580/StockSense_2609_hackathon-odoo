@@ -145,7 +145,18 @@ describe('sessions', () => {
   it('reloads the user on every request, so deactivation takes effect at once', async () => {
     const { agent, user } = await signedIn();
     await prisma.user.update({ where: { id: user.id }, data: { isActive: false } });
-    expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
+    const res = await agent.get('/api/v1/auth/me');
+    expect(res.status).toBe(401);
+    // The web app sends SESSION_EXPIRED back to log-in; UNAUTHENTICATED is left to the page.
+    expect(res.body.error.code).toBe('SESSION_EXPIRED');
+  });
+
+  it('treats a cookie whose session is gone (db:reset, another device) as SESSION_EXPIRED', async () => {
+    const { agent } = await signedIn();
+    await prisma.session.deleteMany();
+    const res = await agent.get('/api/v1/operations');
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('SESSION_EXPIRED');
   });
 
   it('reloads the role on every request', async () => {

@@ -46,13 +46,17 @@ export type SessionLookup =
   | { status: 'expired' }
   | { status: 'ok'; sessionId: string; user: { id: string; name: string; email: string; role: 'MANAGER' | 'STAFF' } };
 
-/** Finds the session for this request's cookie; deletes it if expired or its user is deactivated. */
+/**
+ * Finds the session for this request's cookie; deletes it if expired or its user is deactivated.
+ * A cookie whose session is gone (expired, deleted by `db:reset` or another device, or its user
+ * deactivated) is 'expired', not 'none': the web app sends SESSION_EXPIRED back to log-in.
+ */
 export async function lookupSession(req: Request): Promise<SessionLookup> {
   const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
   if (!token) return { status: 'none' };
   const id = hashToken(token);
   const session = await prisma.session.findUnique({ where: { id }, include: { user: true } });
-  if (!session) return { status: 'none' };
+  if (!session) return { status: 'expired' };
 
   const now = Date.now();
   if (session.expiresAt.getTime() <= now || session.lastSeenAt.getTime() <= now - SESSION_IDLE_MS) {
@@ -61,7 +65,7 @@ export async function lookupSession(req: Request): Promise<SessionLookup> {
   }
   if (!session.user.isActive) {
     await prisma.session.deleteMany({ where: { userId: session.userId } });
-    return { status: 'none' };
+    return { status: 'expired' };
   }
   if (session.lastSeenAt.getTime() < now - TOUCH_EVERY_MS) {
     await prisma.session.updateMany({ where: { id }, data: { lastSeenAt: new Date(now) } });
